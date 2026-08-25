@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+.netlify/
+*.local
+.DS_Store
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+
+# Local Postgres data if someone runs the security tests in-tree
+pgdata/

@@ -1,0 +1,12 @@
+{
+  "name": "degennfl-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd src && npm run dev",
+    "build": "cd src && npm run build",
+    "preview": "cd src && npm run preview",
+    "typecheck": "cd src && npm run typecheck",
+    "test": "cd src && npm run test"
+  }
+}

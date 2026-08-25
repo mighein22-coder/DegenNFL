@@ -1,0 +1,36 @@
+/* ==========================================================================
+ * brand.css — DegenNFL only
+ *
+ * The one file that is NOT shared with FrozenDegenerates. It fills in the
+ * slots that `tokens.shared.css` declares. FrozenDegenerates has a file at
+ * the same path filling the same slots with its `ice` sky-blue ramp.
+ *
+ * If you find yourself wanting to add a new token here, it probably belongs
+ * in tokens.shared.css as a slot instead — otherwise the two apps drift.
+ * ========================================================================== */
+
+:root {
+  /* Turf green. Distinct from the NHL app's ice blue at a glance, which is
+     the point: two sites, one system, no confusion about which you are on. */
+  --brand-50: oklch(0.96 0.03 155);
+  --brand-100: oklch(0.92 0.06 155);
+  --brand-200: oklch(0.86 0.1 155);
+  --brand-300: oklch(0.78 0.14 155);
+  --brand-400: oklch(0.71 0.16 155);
+  --brand-500: oklch(0.63 0.17 155);
+  --brand-600: oklch(0.54 0.15 155);
+  --brand-700: oklch(0.45 0.12 155);
+  --brand-800: oklch(0.36 0.09 155);
+  --brand-900: oklch(0.28 0.07 155);
+
+  /* Near-black slate, shared shape with the NHL app's surfaces. */
+  --surface-canvas: oklch(0.19 0.02 260);
+  --surface-base: oklch(0.25 0.02 260);
+  --surface-raised: oklch(0.3 0.02 260);
+  --surface-sunken: oklch(0.15 0.02 260);
+  --surface-line: oklch(0.36 0.02 260);
+
+  --text-primary: oklch(0.97 0.005 260);
+  --text-muted: oklch(0.72 0.015 260);
+  --text-faint: oklch(0.56 0.015 260);
+}

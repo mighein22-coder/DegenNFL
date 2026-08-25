@@ -1,0 +1,5 @@
+/* Entry point. Order matters: brand.css must define the raw ramp before
+   tokens.shared.css maps it onto the semantic slots Tailwind reads. */
+@import 'tailwindcss';
+@import './brand.css';
+@import './tokens.shared.css';

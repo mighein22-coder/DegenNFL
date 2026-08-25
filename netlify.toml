@@ -1,0 +1,37 @@
+[build]
+  command = "npm --prefix src ci && npm --prefix netlify/functions ci && npm --prefix src run build"
+  publish = "src/dist"
+  functions = "netlify/functions"
+
+[dev]
+  command = "npm run dev"
+  targetPort = 3000
+  port = 8888
+  autoLaunch = false
+  framework = "#custom"
+  base = "src"
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Environment variables (set these in the Netlify dashboard)
+#
+# Client bundle — these are inlined into public JS, so they must not be secret:
+#   VITE_SUPABASE_URL
+#   VITE_SUPABASE_ANON_KEY
+#
+# Functions only (never sent to the browser):
+#   SUPABASE_SERVICE_ROLE_KEY
+#
+# sync-week authenticates the caller's Supabase access token, so there is no
+# shared secret to configure on either side. This is deliberate — the NHL app
+# shipped a VITE_-prefixed secret that Vite inlined into the public bundle, and
+# replacing it was a security fix, not a preference. Do not reintroduce one.

@@ -1,4 +1,4 @@
-import type { Handler } from '@netlify/functions';
+import type { Handler, HandlerResponse } from '@netlify/functions';
 
 /**
  * Netlify Function: team records proxy.
@@ -33,7 +33,8 @@ function collectEntries(node: any, into: any[]): void {
   for (const group of node?.groups ?? []) collectEntries(group, into);
 }
 
-const handler: Handler = async () => {
+// Explicit return type: see the note in nfl-schedule.ts.
+const handler: Handler = async (): Promise<HandlerResponse> => {
   try {
     const response = await fetch(ESPN_STANDINGS);
     if (!response.ok) {

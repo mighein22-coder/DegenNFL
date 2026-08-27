@@ -1,7 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { Button } from '../Button';
 import { GameCard } from '../GameCard';
-import { PICKS_PER_WEEK } from '../../constants';
+import {
+  PICKS_PER_WEEK,
+  ORDINARY_POINTS,
+  BONUS_POINTS,
+  BONUS_PICKS_PER_WEEK,
+  ORDINARY_PICKS_PER_WEEK
+} from '../../constants';
 import { isPickLocked, getFinalLockAt, getTimeUntil } from '../../lib/timezone';
 import type { Game, Pick, Week } from '../../types';
 import type { PickSubmission } from '../../lib/supabaseService';
@@ -12,23 +18,26 @@ import type { PickSubmission } from '../../lib/supabaseService';
  * This is the screen the per-game locking rule actually costs something to
  * build, so the model is worth stating plainly:
  *
- *   * A sheet is FIVE picks with confidence 1..5, no duplicates — same as the
- *     NHL app.
+ *   * A sheet is FIVE picks: four worth 1 point and one worth 3. The 3 is the
+ *     member's bonus game. `confidence` carries the point value itself, so it
+ *     holds only 1 or 3 — there is no 2, and the 1s are not distinguishable
+ *     from one another.
  *   * But games lock ONE AT A TIME, at their own kickoff, with a final lock for
  *     the whole week at Sunday 13:00 ET. So the sheet is not submitted as a
  *     unit. A Thursday game can be locked in while Sunday's are still open.
- *   * A locked pick's confidence is SPENT. If you locked 3 on Thursday night,
- *     3 is gone for the week and the selector must not offer it again.
+ *   * A locked pick's points are SPENT. Lock the bonus in on Thursday night and
+ *     the 3 is gone for the week — the selector must not offer it again. The
+ *     same is true of the four 1s once all four are locked.
  *   * A partial sheet is therefore a normal state, not an error. The save RPC
  *     accepts it; only the unlocked rows are replaced.
  *
- * The consequence for this component: `available confidences` is derived from
- * locked picks plus current draft selections together, never from the draft
+ * The consequence for this component: what is still assignable is derived from
+ * locked picks plus current draft selections TOGETHER, never from the draft
  * alone. Getting that wrong is how a member ends up unable to submit.
  *
- * SCOPE: the state model below is real and is the part worth pinning down. The
- * confidence selector UI itself is left as the marked TODO — it is ordinary
- * component work, unlike the rule above.
+ * Only the bonus needs the 'move it rather than duplicate it' behaviour below.
+ * Ordinary picks are interchangeable, so there is nothing to move — they are
+ * only ever capped.
  */
 
 interface PicksViewProps {
@@ -86,29 +95,40 @@ export const PicksView: React.FC<PicksViewProps> = ({
   });
 
   /**
-   * Confidence values still available to assign.
+   * How much of the week's allowance is already committed.
    *
-   * Locked picks and draft picks are considered TOGETHER. A value burned on a
-   * locked Thursday game is gone for the week — the database enforces that via
-   * a unique constraint, and save_picks reports it as
-   * 'that confidence value is already locked in on another game'. Offering it
-   * here would just produce that error at submit time.
+   * Locked picks and draft picks are counted TOGETHER. Points burned on a
+   * locked Thursday game are gone for the week — the database enforces that
+   * with picks_one_bonus_per_week and picks_enforce_sheet_shape, and save_picks
+   * reports it as 'only one 3-point pick per week'. Offering a value here that
+   * the sheet cannot hold would just produce that error at submit time.
    */
-  const availableConfidences = useMemo(() => {
-    const spent = new Set<number>();
-    for (const pick of lockedPicks) spent.add(pick.confidence);
-    for (const entry of Object.values(draft)) {
-      if (entry.confidence != null) spent.add(entry.confidence);
-    }
-    return Array.from({ length: PICKS_PER_WEEK }, (_, i) => i + 1).filter(
-      c => !spent.has(c)
-    );
+  const spent = useMemo(() => {
+    let ones = 0;
+    let bonus = 0;
+    const count = (value?: number) => {
+      if (value === BONUS_POINTS) bonus++;
+      else if (value === ORDINARY_POINTS) ones++;
+    };
+    for (const pick of lockedPicks) count(pick.confidence);
+    for (const entry of Object.values(draft)) count(entry.confidence);
+    return { ones, bonus };
   }, [lockedPicks, draft]);
 
-  /** Values offered for one game: those still free, plus its own current one. */
-  const confidenceOptions = (current?: number): number[] => {
-    const options = current == null ? availableConfidences : [...availableConfidences, current];
-    return options.sort((a, b) => a - b);
+  /**
+   * Values offered for one game: whatever the week can still hold, plus this
+   * game's own current value — so re-opening the control never hides the number
+   * already assigned to it.
+   */
+  const pointOptions = (current?: number): number[] => {
+    const options: number[] = [];
+    if (spent.ones < ORDINARY_PICKS_PER_WEEK || current === ORDINARY_POINTS) {
+      options.push(ORDINARY_POINTS);
+    }
+    if (spent.bonus < BONUS_PICKS_PER_WEEK || current === BONUS_POINTS) {
+      options.push(BONUS_POINTS);
+    }
+    return options;
   };
 
   const setConfidence = (gameId: string, raw: string) => {
@@ -119,12 +139,16 @@ export const PicksView: React.FC<PicksViewProps> = ({
 
       const next = { ...prev, [gameId]: { ...existing, confidence: value } };
 
-      // Assigning a value that another draft pick holds moves it, rather than
-      // creating a duplicate the database would reject at submit time. The
-      // selector does not offer such a value, but a stale render could.
-      if (value != null) {
+      // Naming a new bonus game MOVES the bonus rather than creating a second
+      // one the database would reject at submit time. The selector does not
+      // offer a taken bonus, but a stale render could.
+      //
+      // Ordinary picks need no equivalent: they are interchangeable, so there
+      // is nothing to move. Too many of them is prevented by not offering the
+      // value in the first place.
+      if (value === BONUS_POINTS) {
         for (const [otherId, other] of Object.entries(prev)) {
-          if (otherId !== gameId && other.confidence === value) {
+          if (otherId !== gameId && other.confidence === BONUS_POINTS) {
             next[otherId] = { ...other, confidence: undefined };
           }
         }
@@ -174,6 +198,8 @@ export const PicksView: React.FC<PicksViewProps> = ({
         <p className="mt-2 text-muted">
           {totalPicked} of {PICKS_PER_WEEK} picked
           {' · '}
+          {spent.bonus > 0 ? 'bonus set' : 'bonus not set'}
+          {' · '}
           sheet closes {getTimeUntil(finalLock, now)}
           {lockedPicks.length > 0 && ` · ${lockedPicks.length} already locked in`}
         </p>
@@ -194,23 +220,20 @@ export const PicksView: React.FC<PicksViewProps> = ({
                   onSelectTeam={teamId => selectTeam(game.id, teamId)}
                 />
 
-                {/* The selector only appears once a side is chosen — a
-                    confidence with no team attached is not a pick. Options are
-                    the values still free for the week PLUS this game's own
-                    current value, so re-opening the control does not hide the
-                    number already assigned to it. */}
+                {/* The selector only appears once a side is chosen — points
+                    with no team attached are not a pick. */}
                 {entry?.selectedTeamId && (
                   <label className="mt-2 flex items-center gap-2 px-1 text-sm text-muted">
-                    Confidence
+                    Worth
                     <select
                       className="rounded-control border border-line bg-surface px-2 py-1 text-ink"
                       value={entry.confidence ?? ''}
                       onChange={e => setConfidence(game.id, e.target.value)}
                     >
                       <option value="">—</option>
-                      {confidenceOptions(entry.confidence).map(c => (
+                      {pointOptions(entry.confidence).map(c => (
                         <option key={c} value={c}>
-                          {c}
+                          {c === BONUS_POINTS ? '3 pts — bonus' : '1 pt'}
                         </option>
                       ))}
                     </select>

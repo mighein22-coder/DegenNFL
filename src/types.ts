@@ -45,7 +45,10 @@ export interface Pick {
   weekId: string;
   gameId: string;
   selectedTeamId: string;
-  /** 1..PICKS_PER_WEEK, no duplicates within a week. */
+  /**
+   * The point value of this pick: ORDINARY_POINTS (1) or BONUS_POINTS (3).
+   * Four 1s and one 3 make a full week. Not a rank — see constants.ts.
+   */
   confidence: number;
   /** 0 on a loss or while pending, equal to `confidence` on a win. */
   pointsEarned: number;

@@ -6,7 +6,8 @@
     "dev": "cd src && npm run dev",
     "build": "cd src && npm run build",
     "preview": "cd src && npm run preview",
-    "typecheck": "cd src && npm run typecheck",
-    "test": "cd src && npm run test"
+    "typecheck": "npm --prefix src run typecheck && npm --prefix netlify/functions run typecheck",
+    "test": "cd src && npm run test",
+    "install_all": "npm --prefix src ci && npm --prefix netlify/functions ci"
   }
 }

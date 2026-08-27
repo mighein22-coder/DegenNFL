@@ -115,10 +115,10 @@ describe('getCurrentWeekNumber', () => {
     expect(getCurrentWeekNumber(new Date('2026-09-15T01:00:00Z'))).toBe(1);
   });
 
-  it('rolls to week 2 on Tuesday morning ET', () => {
-    // Tuesday 2026-09-15 06:00 ET = 10:00Z.
-    expect(getCurrentWeekNumber(new Date('2026-09-15T09:59:00Z'))).toBe(1);
-    expect(getCurrentWeekNumber(new Date('2026-09-15T10:01:00Z'))).toBe(2);
+  it('rolls to week 2 on Tuesday evening ET', () => {
+    // Tuesday 2026-09-15 18:00 EDT = 22:00Z.
+    expect(getCurrentWeekNumber(new Date('2026-09-15T21:59:00Z'))).toBe(1);
+    expect(getCurrentWeekNumber(new Date('2026-09-15T22:01:00Z'))).toBe(2);
   });
 
   it('clamps at the last week once the season is over', () => {
@@ -127,17 +127,17 @@ describe('getCurrentWeekNumber', () => {
 });
 
 describe('getWeekRolloverAt', () => {
-  it('is the Tuesday after the week’s Sunday, at 06:00 ET', () => {
-    // 2026-09-13 is the Sunday; the Tuesday is 2026-09-15, 06:00 EDT = 10:00Z.
-    expect(getWeekRolloverAt(1).toISOString()).toBe('2026-09-15T10:00:00.000Z');
+  it('is the Tuesday after the week’s Sunday, at 18:00 ET', () => {
+    // 2026-09-13 is the Sunday; the Tuesday is 2026-09-15, 18:00 EDT = 22:00Z.
+    expect(getWeekRolloverAt(1).toISOString()).toBe('2026-09-15T22:00:00.000Z');
   });
 
-  it('stays 06:00 ET after the DST change rather than drifting to 05:00', () => {
+  it('stays 18:00 ET after the DST change rather than drifting to 17:00', () => {
     // Week 9's Sunday is 2026-11-08, a week after DST ends; its Tuesday is
-    // 2026-11-10, and 06:00 EST is 11:00Z (not the 10:00Z it would be on EDT).
-    expect(getWeekRolloverAt(9).toISOString()).toBe('2026-11-10T11:00:00.000Z');
+    // 2026-11-10, and 18:00 EST is 23:00Z (not the 22:00Z it would be on EDT).
+    expect(getWeekRolloverAt(9).toISOString()).toBe('2026-11-10T23:00:00.000Z');
     for (let w = 1; w <= WEEK_COUNT; w++) {
-      expect(formatETTime(getWeekRolloverAt(w), 'HH:mm')).toBe('06:00');
+      expect(formatETTime(getWeekRolloverAt(w), 'HH:mm')).toBe('18:00');
     }
   });
 

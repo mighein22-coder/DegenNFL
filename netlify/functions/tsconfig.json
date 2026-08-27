@@ -1,0 +1,29 @@
+{
+  // The functions were never typechecked. They run under the service-role key
+  // and write the columns no client can touch, so "it compiled on Netlify" is
+  // a thin guarantee — esbuild strips types without checking them.
+  //
+  // `npm run typecheck` at the repo root runs this as well as src's.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "types": ["node"]
+  },
+  // `../../src` is deliberate: _shared/etTime.ts re-exports the app's own
+  // timezone and scoring modules rather than copying them, so those are part of
+  // what this checks.
+  "include": ["**/*.ts", "../../src/lib/timezone.ts", "../../src/lib/scoring.ts"],
+  "exclude": ["node_modules"]
+}

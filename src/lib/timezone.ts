@@ -6,8 +6,15 @@ const ET_TIMEZONE = 'America/New_York';
 /** Hour (ET) of the Sunday whole-sheet deadline. */
 const FINAL_LOCK_HOUR = 13;
 
-/** Hour (ET) on Tuesday at which the pool advances to the next week. */
-const ROLLOVER_HOUR = 6;
+/**
+ * Hour (ET) on Tuesday at which the pool advances to the next week.
+ *
+ * This is also when the week’s spreads are captured and frozen, so moving it
+ * moves the moment the sheet opens with lines on it. See the scheduled
+ * function netlify/functions/weekly-rollover.ts, which gates on this exact
+ * time rather than on a UTC cron expression.
+ */
+const ROLLOVER_HOUR = 18;
 
 /**
  * Eastern-time helpers.
@@ -105,7 +112,7 @@ export function isPickLocked(
 }
 
 /**
- * When a week hands over to the next: the TUESDAY after its Sunday, 06:00 ET.
+ * When a week hands over to the next: the TUESDAY after its Sunday, 18:00 ET.
  *
  * That is after Monday Night Football has finished and been scored, and before
  * the new slate is worth showing. Between the Sunday lock and this moment the

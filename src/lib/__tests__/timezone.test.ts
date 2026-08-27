@@ -7,6 +7,7 @@ import {
   isPickLocked,
   getCurrentWeekNumber,
   getWeekRolloverAt,
+  getWeekOpensAt,
   buildWeekId,
   parseWeekId,
   formatETTime,
@@ -123,6 +124,35 @@ describe('getCurrentWeekNumber', () => {
 
   it('clamps at the last week once the season is over', () => {
     expect(getCurrentWeekNumber(new Date('2027-06-01T12:00:00Z'))).toBe(WEEK_COUNT);
+  });
+});
+
+describe('getWeekOpensAt', () => {
+  it('is the Tuesday before the week’s Sunday, at 18:00 ET', () => {
+    // Week 1's Sunday is 2026-09-13; the Tuesday before is 2026-09-08,
+    // 18:00 EDT = 22:00Z. This is when the Week 1 sheet appears with lines on
+    // it — the season opens the following evening.
+    expect(getWeekOpensAt(1).toISOString()).toBe('2026-09-08T22:00:00.000Z');
+  });
+
+  it('is the previous week’s rollover, for every week that has one', () => {
+    // The two are the same instant said two ways. Week 1 is the only week
+    // without a preceding rollover, which is why this helper exists at all.
+    for (let w = 2; w <= WEEK_COUNT; w++) {
+      expect(getWeekOpensAt(w).toISOString()).toBe(getWeekRolloverAt(w - 1).toISOString());
+    }
+  });
+
+  it('stays 18:00 ET across the DST change', () => {
+    for (let w = 1; w <= WEEK_COUNT; w++) {
+      expect(formatETTime(getWeekOpensAt(w), 'HH:mm')).toBe('18:00');
+    }
+  });
+
+  it('falls before its own week’s final lock, by five days', () => {
+    for (let w = 1; w <= WEEK_COUNT; w++) {
+      expect(getWeekOpensAt(w).getTime()).toBeLessThan(getFinalLockAt(w).getTime());
+    }
   });
 });
 

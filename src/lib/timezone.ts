@@ -131,6 +131,25 @@ export function getWeekRolloverAt(weekNumber: number): Date {
 }
 
 /**
+ * When a week's sheet opens: the TUESDAY before its Sunday, 18:00 ET.
+ *
+ * The same instant as `getWeekRolloverAt(weekNumber - 1)` for every week but
+ * the first, which has no preceding week to roll over from. Expressed from the
+ * week's own Sunday so week 1 is not a special case, and so a screen can say
+ * when its sheet appears without knowing what came before it.
+ *
+ * This is also the moment the week's schedule is seeded and every line in it is
+ * captured and frozen — see netlify/functions/weekly-rollover.ts. Before it, a
+ * week legitimately has no games and no numbers.
+ */
+export function getWeekOpensAt(weekNumber: number): Date {
+  const { year, month, day } = parseDateParts(getWeekSunday(weekNumber));
+  // day - 5 is the Tuesday before; the Date constructor normalises underflow
+  // into the previous month.
+  return fromZonedTime(new Date(year, month, day - 5, ROLLOVER_HOUR, 0, 0, 0), ET_TIMEZONE);
+}
+
+/**
  * The week number the pool is currently on.
  *
  * Clamped to 1..WEEK_COUNT: before the season it reads 1, after it reads 18.

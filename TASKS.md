@@ -50,9 +50,12 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ## Application
 
-- [ ] Wire `/picks`: load week + games + picks, render the existing `PicksView`,
-      wire `onSave` to `savePicks()`. The per-game locking model is already in
-      the component; this is plumbing.
+- [x] Wire `/picks`. `PicksPage` is the container; `PicksView` stays pure.
+      Covers both non-error empty states: a week whose schedule is not captured
+      yet, and games the book never opened a line on.
+- [ ] Run `/picks` against a real Supabase. It has never been executed — there
+      is no `.env.local` in the repo, so it typechecks and builds but has not
+      loaded a row. Do this before 8 Sep.
 - [ ] Build the real views — each stub under `src/components/views/` lists what
       it needs. Rough order of value: Dashboard, Standings, League Matrix,
       My History, Team Affinity, Settings, Admin.
@@ -92,6 +95,16 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ## Done (this session)
 
+- [x] `/picks` wired: `PicksPage` loads the week, its games and the member’s
+      picks, renders `PicksView`, and saves through `save_picks`. It also
+      triggers `sync-week` after first paint, which is how scores land between
+      Tuesdays.
+- [x] `GameCard` no longer offers a game with no line. It was showing “line not
+      posted” and still accepting the click, which `save_picks` and the RLS
+      policy would both have rejected at submit time.
+- [x] `getWeekOpensAt()` — the Tuesday a week’s sheet appears, for the screen
+      that has to say so. Same instant as the previous week’s rollover for every
+      week but the first, which is asserted rather than assumed.
 - [x] ESPN spike run and reconciled; every `TODO(spike)` in the schedule and
       sync paths resolved against real payloads.
 - [x] **Scoring changed to 4x1 + 1x3.** `picks.confidence` now holds a point

@@ -35,7 +35,8 @@ src/                  the Vite + React app (its own package)
   styles/               tokens.shared.css (shared) + brand.css (ours)
 netlify/functions/    serverless functions (its own package)
 supabase/
-  migrations/           0001_init.sql — the whole schema, already locked down
+  migrations/           0001_init.sql — the schema, already locked down
+                        0002_…sql     — 4×1 + 1×3 scoring, and its guards
   test/                 applies it to a throwaway Postgres and attacks it
 scripts/
   spike-espn.mjs        run this first — see TASKS.md

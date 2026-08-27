@@ -1,5 +1,5 @@
 -- ============================================================================
--- Security tests for 0001_init.sql.
+-- Security tests for the schema: 0001_init.sql plus every migration after it.
 --
 -- Each case plays the part of a member with nothing but the anon key and a SQL
 -- console — the threat model FrozenDegenerates 0001–0008 were written against.

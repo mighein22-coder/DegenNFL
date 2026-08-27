@@ -44,11 +44,20 @@ no client can touch, which is the code least able to afford that. Adding
 
 ## Applying the schema
 
-There is one migration, and it creates everything:
+Migrations are applied in filename order:
 
 ```sh
-psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/0001_init.sql
+for m in supabase/migrations/*.sql; do
+  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$m"
+done
 ```
+
+`0001_init.sql` creates the schema in its locked-down end state.
+`0002_scoring_and_activation.sql` moves scoring to 4×1 + 1×3 and adds the
+guards that go with it. **0002 refuses to run** against picks holding a
+confidence outside {1, 3} — it names the rows rather than letting a constraint
+fail halfway through, because a 1..5 rank does not map onto 1/3 scoring by any
+rule a migration should invent for you.
 
 Then run the verification queries commented at the bottom of that file against
 the live project. They confirm:

@@ -217,7 +217,7 @@ Two consequences accepted up front:
 
 ## Verifying the security model
 
-The guards in `0001_init.sql` are the whole security model, and a migration
+The guards in the migrations are the whole security model, and a migration
 whose policies have only ever been *read* is one you are trusting on vibes. So:
 
 ```sh

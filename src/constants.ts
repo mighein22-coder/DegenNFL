@@ -42,9 +42,9 @@ export const PICKS_PER_WEEK = 5;
  *
  * Four games at 1 point and one at 3 — see 'Rules of the pool' in CLAUDE.md.
  * These are the only two values `picks.confidence` may hold, and the database
- * says so three times over in 0001_init.sql: the CHECK on the column, the
- * picks_one_bonus_per_week partial index, and the picks_enforce_sheet_shape
- * trigger.
+ * says so three times over in 0002_scoring_and_activation.sql: the CHECK on
+ * the column, the picks_one_bonus_per_week partial index, and the
+ * picks_enforce_sheet_shape trigger.
  *
  * The column is still called `confidence` because that is still what it means
  * — which game you like most — even though it now carries the point value

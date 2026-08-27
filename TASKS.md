@@ -33,10 +33,10 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ## Infrastructure
 
-- [ ] Apply `supabase/migrations/0001_init.sql` to the `degen-NFL-pool` project.
-      The project exists; the schema has not been confirmed applied. If it was
-      applied before the 1/3 scoring change, it needs re-applying or a 0002 —
-      the picks constraints changed.
+- [ ] Apply `supabase/migrations/0002_scoring_and_activation.sql` to the
+      `degen-NFL-pool` project. 0001 is already applied there. 0002 stops and
+      names the rows if any pick holds a confidence outside {1, 3}, so it is
+      safe to run blind.
 - [ ] Run the verification queries at the bottom of that migration against the
       live project, not just the test harness.
 - [ ] Create the Netlify site, point it at this repo, set `VITE_SUPABASE_URL`,

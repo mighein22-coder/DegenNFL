@@ -23,7 +23,7 @@ Always verify `npm run build` passes locally before committing.
 
 ## Rules of the pool
 
-- Five picks a week, confidence 1–5, no duplicates.
+- Five picks a week,4 games worth 1 point, 1 game worth 3 points.  
 - Picked **against the spread**, not straight up.
 - Every stored spread is hooked to a half point, so every pick is a win or a
   loss. There is no push state anywhere in the system, and points are integers.

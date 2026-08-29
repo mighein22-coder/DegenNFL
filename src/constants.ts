@@ -17,14 +17,47 @@ import type { Team } from './types';
  */
 export const SEASON = 2026;
 
-/** Sunday of Week 1, YYYY-MM-DD. 2026: kickoff Thu 10 Sep, first Sunday 13 Sep. */
+/**
+ * Sunday of Week 1, YYYY-MM-DD.
+ *
+ * 2026: the season opens Wednesday 9 Sep (NE @ SEA, 20:20 ET), there is a
+ * second game Thursday 10 Sep, and the first Sunday slate is 13 Sep. Confirmed
+ * against the published ESPN schedule, which is what this anchor has to agree
+ * with — note it is the SUNDAY that anchors the calendar, not the opener.
+ *
+ * One consequence worth knowing: the week rolls over Tuesday 18:00 ET, so in
+ * 2026 the Week 1 sheet is open for about 26 hours before its first game locks.
+ * That is the tightest window of the season.
+ */
 export const SEASON_WEEK1_SUNDAY = '2026-09-13';
 
 /** NFL regular season length. 18 weeks since 2021. */
 export const WEEK_COUNT = 18;
 
-/** Picks per week, and therefore the confidence range: 1..PICKS_PER_WEEK. */
+/** Picks per week: four ordinary and one bonus. */
 export const PICKS_PER_WEEK = 5;
+
+/**
+ * What a pick is worth.
+ *
+ * Four games at 1 point and one at 3 — see 'Rules of the pool' in CLAUDE.md.
+ * These are the only two values `picks.confidence` may hold, and the database
+ * says so three times over in 0002_scoring_and_activation.sql: the CHECK on
+ * the column, the picks_one_bonus_per_week partial index, and the
+ * picks_enforce_sheet_shape trigger.
+ *
+ * The column is still called `confidence` because that is still what it means
+ * — which game you like most — even though it now carries the point value
+ * directly rather than a 1..5 rank.
+ */
+export const ORDINARY_POINTS = 1;
+export const BONUS_POINTS = 3;
+
+/** How many of the week's picks carry BONUS_POINTS. */
+export const BONUS_PICKS_PER_WEEK = 1;
+
+/** ...and therefore how many carry ORDINARY_POINTS. */
+export const ORDINARY_PICKS_PER_WEEK = PICKS_PER_WEEK - BONUS_PICKS_PER_WEEK;
 
 /** Label shown for the whole-season view, alongside the three segments. */
 export const FULL_SEASON_LABEL = 'Full Season';

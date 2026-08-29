@@ -26,13 +26,38 @@ Locally, `src/.env.local` (gitignored) holds the two public values. Copy
 
 ---
 
-## Applying the schema
+## Installing and checking
 
-There is one migration, and it creates everything:
+There are two packages, and both need installing:
 
 ```sh
-psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/0001_init.sql
+npm run install_all
 ```
+
+`npm run typecheck` covers both. The Netlify functions were previously not
+typechecked at all — esbuild strips types without checking them, so "it deployed"
+never meant "it compiles". They hold the service-role key and write the columns
+no client can touch, which is the code least able to afford that. Adding
+`netlify/functions/tsconfig.json` surfaced two real errors on the first run.
+
+---
+
+## Applying the schema
+
+Migrations are applied in filename order:
+
+```sh
+for m in supabase/migrations/*.sql; do
+  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$m"
+done
+```
+
+`0001_init.sql` creates the schema in its locked-down end state.
+`0002_scoring_and_activation.sql` moves scoring to 4×1 + 1×3 and adds the
+guards that go with it. **0002 refuses to run** against picks holding a
+confidence outside {1, 3} — it names the rows rather than letting a constraint
+fail halfway through, because a 1..5 rank does not map onto 1/3 scoring by any
+rule a migration should invent for you.
 
 Then run the verification queries commented at the bottom of that file against
 the live project. They confirm:
@@ -98,29 +123,63 @@ against the deployed site after any change here.
 
 ### Each week
 
-Weeks seed themselves — the row is created the first time any member opens the
-app in a new week, and the database derives its number and deadline from the id.
-Schedules do not: an admin syncs a week's games from the Admin panel.
+Nothing to do. The `weekly-rollover` scheduled function runs **Tuesday 18:00 ET**
+and does the whole handover:
 
-Scores move when a member opens the app, which calls `sync-week`. That function
-also **freezes each game's line at kickoff** — after which the line never moves
-again, and every member is graded against the same number.
+1. grades and closes the week that just finished (Monday Night Football is done
+   by then);
+2. creates the new week's row, seeds its schedule from ESPN, and **captures and
+   freezes every line in it at once**.
 
-### If a line is missing at kickoff
+After that the sheet is open with numbers on it, and no line in the week moves
+again no matter what the market does.
 
-`sync-week` reports `No line available for X @ Y at kickoff` in its `errors`
-array. Picks on that game cannot be graded until a line exists. Set it directly
-with the service-role key — it is not writable any other way, by anyone:
+Scores keep landing through the week whenever a member opens the app, which
+calls `sync-week`. That is deliberate: results have to appear Thursday, Sunday
+and Monday as games finish, not once a week. `sync-week` no longer touches the
+spread at all.
 
-```sql
-update public.games
-   set spread = -3.5,                    -- must end in .5; the CHECK enforces it
-       spread_captured_at = now()
- where id = '<game uuid>' and spread is null;
+#### Why the cron fires twice
+
+Netlify cron expressions are UTC only, and Tuesday 18:00 ET is 22:00 UTC on EDT
+but 23:00 UTC on EST. A single fixed hour would drift when DST ends in November,
+halfway through the season. So it is scheduled `0 22,23 * * 2` and decides for
+itself which firing is the real one. The other is a no-op, as is any re-run: a
+line already frozen is never re-priced.
+
+### If the Tuesday job does not run
+
+An admin can do the same thing by hand from the Admin panel, which calls
+`activateWeek(weekNumber)` in `src/lib/supabaseService.ts` and reaches the same
+code through `admin-activate-week`. Safe to run twice.
+
+### If a line is missing when the week opens
+
+The rollover logs, loudly:
+
+```
+[ROLLOVER] Week 12 opened with 1 game(s) missing a line — an admin must set
+these: MIN @ TB
 ```
 
-Then re-run the sync. Note the `and spread is null` guard: never overwrite a
-line that has already been frozen.
+This happens when the book had the game OFF at capture time. That game is
+seeded and visible but **not pickable** — `game_has_line()` blocks it — so
+nobody can pick blind against a number that does not exist. You have until
+Sunday, not until kickoff.
+
+Fix it from the Admin panel, which calls `setSpread(gameId, rawSpread)`, or
+directly:
+
+```sql
+-- Pass the RAW line from the HOME team's point of view; the function hooks it.
+-- -3 is stored as -3.5, because the half point always goes against the
+-- favourite. Admin-only, and it refuses to touch a line already frozen.
+select public.admin_set_spread('<game uuid>', -3);
+```
+
+Prefer that over an `update`: `games.spread` is not writable by any client
+grant, and `admin_set_spread` applies the hook and the "never overwrite"
+guard for you.
 
 ### Closing a week
 

@@ -1,36 +1,31 @@
-import type { Handler, HandlerEvent } from '@netlify/functions';
+import type { Handler, HandlerEvent, HandlerResponse } from '@netlify/functions';
 import { hookSpread } from '../../src/lib/scoring';
+import { extractSpread, fetchScoreboard } from './_shared/weekLifecycle';
 
 /**
- * Netlify Function: fetch one NFL week's schedule (and its lines).
+ * Netlify Function: fetch one NFL week's schedule and its lines.
  *
- * ============================ STUB — READ THIS ==============================
+ * READ-ONLY. It reports what ESPN currently says about a week so an admin can
+ * look before activating it — nothing here writes to the database. Seeding the
+ * schedule and freezing the lines is `activateWeek` in
+ * `_shared/weekLifecycle.ts`, reached through the Tuesday cron or
+ * `admin-activate-week`.
  *
- * The ESPN parsing below is NOT verified. The session that scaffolded this repo
- * could not reach site.api.espn.com (blocked by the environment's egress
- * policy), so the response shape here is written from the endpoint's documented-
- * by-observation structure and has never been run against a real payload.
+ * The parsing itself lives in `_shared/weekLifecycle.ts` rather than here.
+ * It used to be duplicated between this file and sync-week because both were
+ * unverified guesses at the same unknown shape, and sharing two guesses would
+ * only have made them look more trustworthy than they were. The spike settled
+ * the shape on 2026-08-26, so there is now one copy with the evidence written
+ * next to it.
  *
- * Before trusting it, run the spike on a machine with open network access:
- *
- *     node scripts/spike-espn.mjs 8
- *     node scripts/spike-espn.mjs 8 --json > week8.json
- *
- * and reconcile every `TODO(spike)` below with what actually comes back.
- * ============================================================================
- *
- * There is no free official NFL API equivalent to the NHL one this project's
- * sibling uses, which is why this undocumented endpoint is the candidate. It
- * can change without notice — keeping all of the parsing in this one file is
- * deliberate, so the blast radius of that is one module.
+ * ESPN's scoreboard endpoint is undocumented and can change without notice,
+ * which is why all of the parsing sits behind that one module.
  *
  * POST body: { weekNumber: number, season?: number }
  * Returns:   { games: GameSeed[], sourceUrl: string }
  */
 
-const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard';
-
-/** Rows shaped for a direct insert into `games`. Snake_case to match Postgres. */
+/** Rows shaped like `games`. Snake_case to match Postgres. */
 interface GameSeed {
   week_id: string;
   espn_event_id: string;
@@ -41,68 +36,15 @@ interface GameSeed {
   /**
    * Reported for reference only. `games.spread` is not client-writable — the
    * column grants in 0001_init.sql see to that — so a caller cannot persist
-   * this. Freezing the line is sync-week's job, under the service-role key.
+   * this. Freezing the line is activation's job, under the service-role key.
    */
   spread: number | null;
 }
 
-/**
- * Pulls a signed, home-relative spread out of an ESPN odds object.
- *
- * TODO(spike): confirm which of these branches actually fires. They handle the
- * three shapes the endpoint is reported to use, and they disagree about sign
- * conventions, so guessing wrong inverts every favourite in the pool.
- *
- * The `details` branch is the dangerous one: "KC -3.5" names the FAVOURITE by
- * abbreviation, not the home team, so the sign has to be flipped when the
- * favourite is the away side. Verify against a game where the away team is
- * favoured before trusting it.
- */
-function extractSpread(
-  odds: any,
-  homeAbbrev: string,
-  awayAbbrev: string
-): number | null {
-  if (!odds) return null;
-
-  // Shape 1: an explicit home-relative numeric spread.
-  if (typeof odds.spread === 'number') {
-    return odds.spread;
-  }
-
-  // Shape 2: per-team odds objects.
-  if (typeof odds.homeTeamOdds?.spread === 'number') {
-    return odds.homeTeamOdds.spread;
-  }
-  if (typeof odds.awayTeamOdds?.spread === 'number') {
-    return -odds.awayTeamOdds.spread;
-  }
-
-  // Shape 3: the "ABBR -3.5" string. Pick'em is often spelled "EVEN"/"PK".
-  if (typeof odds.details === 'string') {
-    const details = odds.details.trim();
-
-    if (/^(even|pk|pick)$/i.test(details)) return 0;
-
-    const match = /^([A-Z]{2,4})\s+([+-]?\d+(?:\.\d+)?)$/.exec(details);
-    if (match) {
-      const [, abbrev, value] = match;
-      const magnitude = Number(value);
-
-      if (abbrev === homeAbbrev) return magnitude;
-      if (abbrev === awayAbbrev) return -magnitude;
-
-      // An abbreviation matching neither side means our team map and ESPN's
-      // disagree. Returning null loses the line; returning a guess loses money.
-      console.warn(`[NFL SCHEDULE] Unrecognised favourite "${abbrev}" in "${details}"`);
-      return null;
-    }
-  }
-
-  return null;
-}
-
-const handler: Handler = async (event: HandlerEvent) => {
+// The explicit return type matters: without it TypeScript infers a union of the
+// literal shapes returned below, and a branch that omits `headers` widens the key
+// to `undefined`, which the HandlerResponse index signature rejects.
+const handler: Handler = async (event: HandlerEvent): Promise<HandlerResponse> => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
@@ -124,15 +66,7 @@ const handler: Handler = async (event: HandlerEvent) => {
     }
 
     const weekId = `week-${season}-${String(weekNumber).padStart(2, '0')}`;
-    // seasontype=2 is the regular season (1 = pre, 3 = post).
-    const url = `${ESPN_BASE}?dates=${season}&seasontype=2&week=${weekNumber}`;
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`ESPN returned status ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await fetchScoreboard(season, weekNumber);
     const events: any[] = data.events ?? [];
 
     const games: GameSeed[] = [];
@@ -163,8 +97,8 @@ const handler: Handler = async (event: HandlerEvent) => {
         away_team_id: awayAbbrev,
         start_time: espnEvent.date,
         status: 'SCHEDULED',
-        // Hooked here so what the pick sheet displays is the number the pool
-        // will actually be graded against — never the raw market line.
+        // Hooked here so the preview shows the number the pool would actually
+        // be graded against — never the raw market line.
         spread: raw === null ? null : hookSpread(raw)
       });
     }

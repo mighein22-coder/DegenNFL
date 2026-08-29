@@ -143,35 +143,75 @@ export async function getGamesForWeek(weekId: string): Promise<Game[]> {
  * sync-week. The function returns a hooked spread for display, but it is not
  * ours to persist.
  */
-export async function syncScheduleForWeek(weekNumber: number): Promise<number> {
-  const response = await fetch('/.netlify/functions/nfl-schedule', {
+export interface ActivationResult {
+  weekId: string;
+  gamesSeeded: number;
+  linesFrozen: number;
+  /** Matchups that opened without a line. Each needs setSpread() from an admin. */
+  gamesWithoutLine: string[];
+  errors: string[];
+}
+
+/**
+ * Open a week by hand: seed its schedule and freeze its lines.
+ *
+ * Normally the Tuesday 18:00 ET cron does this and nobody touches it — see
+ * netlify/functions/weekly-rollover.ts. This is the admin's manual trigger for
+ * the Tuesdays it does not happen, and the recovery path for a week that needs
+ * re-seeding.
+ *
+ * Safe to run twice: a line already frozen is never re-priced, so a second run
+ * reports zero lines frozen and changes nothing.
+ *
+ * The seeding itself happens server-side under the service-role key rather than
+ * here, because `games.spread` is not client-writable by any grant. The client
+ * could seed the schedule; it could never set a line.
+ */
+export async function activateWeek(weekNumber: number): Promise<ActivationResult> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('activateWeek: not signed in');
+
+  const response = await fetch('/.netlify/functions/admin-activate-week', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
     body: JSON.stringify({ weekNumber, season: SEASON })
   });
 
   if (!response.ok) {
-    throw new Error(`nfl-schedule returned ${response.status}`);
+    const detail = await response.json().catch(() => ({}));
+    throw new Error(detail.error ?? `admin-activate-week returned ${response.status}`);
   }
 
-  const { games } = (await response.json()) as {
-    games: Array<Record<string, unknown>>;
-  };
+  return (await response.json()) as ActivationResult;
+}
 
-  const seeds = games.map(g => ({
-    week_id: g.week_id,
-    espn_event_id: g.espn_event_id,
-    home_team_id: g.home_team_id,
-    away_team_id: g.away_team_id,
-    start_time: g.start_time
-  }));
-
-  const { error } = await supabase
-    .from('games')
-    .upsert(seeds, { onConflict: 'week_id,espn_event_id', ignoreDuplicates: true });
+/**
+ * Set the line on a game that opened without one.
+ *
+ * Spreads are captured once, when the week is activated. A game the book had
+ * OFF at that moment lands with a null spread and is unpickable until this is
+ * called — so it is the admin's job before Sunday, not an emergency at kickoff.
+ *
+ * Takes the RAW line from the home team's point of view; the database hooks it
+ * to a half point, exactly as hookSpread() would. Pass -3 and the game is
+ * stored at -3.5.
+ *
+ * Goes through an RPC rather than an update because `games.spread` is not
+ * client-writable — admin_set_spread is SECURITY DEFINER and does its own admin
+ * check. It refuses to overwrite a line that is already frozen.
+ */
+export async function setSpread(gameId: string, rawSpread: number): Promise<Game> {
+  const { data, error } = await supabase.rpc('admin_set_spread', {
+    p_game_id: gameId,
+    p_raw_spread: rawSpread
+  });
 
   if (error) throw error;
-  return seeds.length;
+  return toGame(data as GameRow);
 }
 
 // ---------------------------------------------------------------------------

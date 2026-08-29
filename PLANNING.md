@@ -16,13 +16,14 @@ A scaffold, not a working pool. Honestly:
 
 | Area | State |
 |---|---|
-| Database schema + security model | **Real.** Applied to a live Postgres and attacked; 40 assertions pass. |
+| Database schema + security model | **Real.** Applied to a live Postgres and attacked; 52 assertions pass. |
 | Scoring (`src/lib/scoring.ts`) | **Real**, unit tested. |
-| Week calendar, locking, segments | **Real**, unit tested (69 tests total). |
+| Week calendar, locking, segments | **Real**, unit tested (78 tests total). |
 | Design tokens + Tailwind pipeline | **Real**, verified through to the built CSS. |
-| NFL schedule / odds ingestion | **Stub.** Unverified — see *The open spike* below. |
+| NFL schedule / odds ingestion | **Real.** Parsing verified against live payloads — see *What the spike found*. |
+| Week activation + rollover cron | **Real**, not yet exercised against a live Supabase. |
 | Most screens | **Stubs** that state what they need. |
-| `PicksView` | Locking model is real; it is not yet wired to data. |
+| `PicksView` | Locking model and the 1/3 sheet are real; not yet wired to data. |
 
 ---
 
@@ -32,7 +33,7 @@ The NHL app is the reference, and most of it carries over unchanged: React 19 +
 Vite, Supabase for auth and data, Netlify for hosting and functions, the same
 three-package layout (`/`, `src/`, `netlify/functions/`), the same
 `computeStandings` with its points → wins → name tiebreaker and competition
-ranks, the same pick model (five games, confidence 1–5, no duplicates).
+ranks, similar pick model (five games, confidence is 4 games at 1 point and 1 game at 3 points, no duplicates).
 
 The security model carries over *deliberately and completely*. FrozenDegenerates
 reached its current state over eight migrations, most written after a review
@@ -76,8 +77,9 @@ treats a sheet that omits locked picks as correct rather than as a deletion.
 
 Picks are graded against a line, not on who won outright. The line lives on
 `games.spread`, expressed from the **home** team's point of view (negative =
-home favoured), and it is frozen at kickoff so every member is graded against
-one number.
+home favoured).   The spreads are set once on Tuesday when the next week's sheet 
+becomes available, not before, and it is then frozen for the week and forever after.  If no spread
+is available,the admin will add one manually.
 
 **Every stored spread ends in a half point.** A line of `-3` is hooked to `-3.5`
 before it is ever written; the half point always goes *against* the favourite,
@@ -98,7 +100,27 @@ quiet ties nobody notices until a payout is disputed. With the constraint, it is
 a failed insert instead.
 
 The cost, stated plainly: the pool is not playing the real market line. That is
-the trade — half a point of accuracy for the elimination of every push.
+the trade — half a point of accuracy for the elimination of every push. Setting
+the line on Tuesday widens that gap deliberately: a Sunday afternoon game is
+picked against a number five days old, injuries and all. The number is the
+pool's, not the market's, and every member is looking at the same one all week.
+
+#### How the Tuesday capture happens
+
+This is the only time-triggered thing in the app — everything else happens
+because a member opened a page. `netlify/functions/weekly-rollover.ts` runs on a
+cron, closes the finished week and activates the next one.
+
+Netlify cron is UTC only, and Tuesday 18:00 ET is 22:00 UTC on EDT but 23:00 UTC
+on EST — a single fixed hour would drift when the clocks change in November,
+halfway through the season. So it fires at both and decides for itself which one
+is real, using the same `getCurrentWeekNumber` the UI uses. Everything it does
+is idempotent, because a job that fires twice a week has to be: a line already
+frozen is never re-priced.
+
+If a Tuesday is missed, an admin runs the same code from the Admin panel
+(`admin-activate-week`). One implementation, two triggers — a second copy would
+eventually disagree with the first about what a week's lines are.
 
 ### Smaller differences
 
@@ -112,35 +134,54 @@ the trade — half a point of accuracy for the elimination of every push.
   calendar enumeration, just arithmetic.
 * **32 teams with bye weeks.** Four to six teams are idle each week; a team with
   no game is not missing data. This mostly affects the team-stats screens.
-* **The week rolls over Tuesday 06:00 ET**, after Monday Night Football has been
+* **The week rolls over Tuesday 18:00 ET**, after Monday Night Football has been
   scored — not at the Sunday lock, so members see their locked sheet and the
   results landing rather than a week they cannot pick yet.
 
 ---
 
-## The open spike
+## What the spike found
 
-**`netlify/functions/nfl-schedule.ts` is unverified and must not be trusted yet.**
+Run on 2026-08-26 against ESPN's undocumented scoreboard endpoint, which is the
+candidate because there is no free official NFL API equivalent to the NHL one
+the sibling app uses. All three questions are answered, and one of the answers
+changed the design.
 
-There is no free official NFL API equivalent to the NHL one the sibling app
-uses. The candidate is ESPN's undocumented scoreboard endpoint. The session that
-built this scaffold could not reach `site.api.espn.com` — the environment's
-network egress policy denied it — so the parsing was written from the endpoint's
-reported shape and **has never been run against a real payload**.
+**1. The odds shape, and the sign.** `competitions[0].odds[0].spread` is a
+number and is already **home-relative** — the same convention `games.spread`
+uses. The `details: "KC -3.5"` string is *not*: it names the favourite, so it
+means the opposite thing for half the league. The parser takes the number and
+treats the string as a fallback that resolves the abbreviation to a side first.
 
-Run `node scripts/spike-espn.mjs 8` on a machine with open network access and
-reconcile every `TODO(spike)`. Three questions decide the design:
+This was checked directly against all 14 away-favoured games in 2026 weeks 1–3,
+because that is the case that inverts silently. `BAL @ IND` reports
+`details: "BAL -3.5"` alongside `spread: 3.5` — from Indianapolis's point of
+view, as required. `src/lib/__tests__/espnOdds.test.ts` pins this down with the
+real payloads, including that both branches produce the same number.
 
-1. Does `competitions[0].odds[]` carry a spread, and in what shape? A
-   `details: "KC -3.5"` string needs the abbreviation resolved to home or away
-   before its sign means anything — **test a game where the away team is
-   favoured**, the case most likely to be silently inverted.
-2. Is the line present for *future* weeks? The pick sheet needs to show one.
-3. Does the line survive once a game is FINAL?
+**2. Lines exist for future weeks.** 48 of 48 scheduled games carried odds, a
+year out. The pick sheet will have numbers on it.
 
-Question 3 already has a pessimistic answer baked in: the schema stores the line
-rather than re-fetching it. That is correct either way, and doubly so given
-hooking — a stored, hooked line is the pool's own number, not the market's.
+**3. The line does NOT survive a completed game.** Zero of 64 FINAL games across
+four sampled weeks carried an `odds` array at all. The correlation is absolute:
+scheduled games have odds, finished games have none.
+
+That third answer is why lines are captured on Tuesday rather than at kickoff.
+The original design froze each line at its own game's kickoff, which — given a
+sync that only ran when a member opened the app — meant racing the feed for the
+number and usually losing, leaving games that could never be graded. Capturing
+while every game in the week is still SCHEDULED is on the safe side of that
+boundary by days rather than seconds.
+
+One thing the spike found that has no clean answer: a book sometimes has a game
+OFF, reporting an odds object with no `spread` and no `details` (2026 week 3
+`MIN @ TB`). Those games are seeded with a null spread and are **not pickable**
+until an admin sets a line with `admin_set_spread`. Blocking is deliberate — a
+pick made against a line that does not exist cannot be graded afterwards, and
+the member had no number in front of them when they made it.
+
+ESPN can change any of this without notice, which is why all the parsing lives
+in one module, `netlify/functions/_shared/weekLifecycle.ts`.
 
 ---
 
@@ -176,7 +217,7 @@ Two consequences accepted up front:
 
 ## Verifying the security model
 
-The guards in `0001_init.sql` are the whole security model, and a migration
+The guards in the migrations are the whole security model, and a migration
 whose policies have only ever been *read* is one you are trusting on vibes. So:
 
 ```sh
@@ -196,8 +237,12 @@ change to the migration.
   from the DegenNFL `CLAUDE.md` itself. Where that file disagrees, **it wins**.
 * Pick'em hooking to home −0.5 is a convention, not a derivation. Away −0.5
   would be equally defensible.
-* `SEASON_WEEK1_SUNDAY = 2026-09-13` assumes the 2026 season opens Thursday
-  10 September. Confirm against the published schedule.
+* `SEASON_WEEK1_SUNDAY = 2026-09-13` is **confirmed** against the published
+  ESPN schedule: the first Sunday slate is 13 September 2026. Note the season
+  actually opens *Wednesday* 9 September (NE @ SEA), with a second game on the
+  Thursday — it is the Sunday that anchors the calendar, not the opener. One
+  consequence: with rollover at Tuesday 18:00 ET, the Week 1 sheet is open for
+  about 26 hours before its first game locks, the tightest window of the season.
 * The season anchor is mirrored in **two** places — `src/constants.ts` and
   `season_week1_sunday()` in the migration. They compute independently on
   purpose; nothing will catch a mismatch automatically.

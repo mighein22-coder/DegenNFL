@@ -9,27 +9,34 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ## Blocking everything downstream
 
-- [ ] **Run the ESPN spike.** `node scripts/spike-espn.mjs 8` on a machine with
-      open network access (the scaffolding session was blocked from reaching
-      `site.api.espn.com`). Answer the three questions in the script header,
-      then reconcile every `TODO(spike)` in `netlify/functions/nfl-schedule.ts`
-      and `sync-week.ts`. Nothing that touches real games can be trusted until
-      this is done.
-      - [ ] Confirm the odds shape, and **test a game where the AWAY team is
-            favoured** — that is where the sign gets silently inverted.
-      - [ ] Confirm whether lines exist for future weeks.
-      - [ ] Confirm whether lines survive a completed game.
-      - [ ] Once settled, de-duplicate `extractSpread` into
-            `netlify/functions/_shared/`.
+- [ ] **Apply the schema to `degen-NFL-pool` and verify it live.** The
+      migration passes 52 assertions against a throwaway Postgres 17, but it
+      has not been run against the real project. Nothing else on this list can
+      be exercised until it has. See Infrastructure below.
 
-- [ ] **Confirm the season anchor.** `SEASON_WEEK1_SUNDAY = '2026-09-13'` in
-      `src/constants.ts` assumes the season opens Thursday 10 September 2026.
-      It is mirrored in `season_week1_sunday()` in the migration — **change both
-      or neither.**
+- [X] **Run the ESPN spike.** Done 2026-08-26 — see *What the spike found* in
+      `PLANNING.md`. All three questions answered; the third one (lines vanish
+      once a game is FINAL) is why capture moved to Tuesday.
+      - [X] Odds shape confirmed, including all 14 away-favoured games in weeks
+            1–3. `odds[0].spread` is home-relative; `details` names the
+            favourite. Pinned by `src/lib/__tests__/espnOdds.test.ts`.
+      - [X] Lines exist for future weeks — 48 of 48, a year out.
+      - [X] Lines do NOT survive a completed game — 0 of 64.
+      - [X] `extractSpread` de-duplicated into
+            `netlify/functions/_shared/weekLifecycle.ts`.
+
+- [X] **Confirm the season anchor.** `SEASON_WEEK1_SUNDAY = '2026-09-13'` in
+      `src/constants.ts`, mirrored in `season_week1_sunday()` in the migration —
+      **change both or neither.** Confirmed against the published schedule: the
+      first Sunday is 13 Sep 2026. (The season opens Wed 9 Sep, not Thu 10 —
+      the comment said Thursday and has been corrected.)
 
 ## Infrastructure
 
-- [ ] Create the DegenNFL Supabase project; apply `supabase/migrations/0001_init.sql`.
+- [ ] Apply `supabase/migrations/0002_scoring_and_activation.sql` to the
+      `degen-NFL-pool` project. 0001 is already applied there. 0002 stops and
+      names the rows if any pick holds a confidence outside {1, 3}, so it is
+      safe to run blind.
 - [ ] Run the verification queries at the bottom of that migration against the
       live project, not just the test harness.
 - [ ] Create the Netlify site, point it at this repo, set `VITE_SUPABASE_URL`,
@@ -43,13 +50,22 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ## Application
 
-- [ ] Wire `/picks`: load week + games + picks, render the existing `PicksView`,
-      wire `onSave` to `savePicks()`. The per-game locking model is already in
-      the component; this is plumbing.
+- [x] Wire `/picks`. `PicksPage` is the container; `PicksView` stays pure.
+      Covers both non-error empty states: a week whose schedule is not captured
+      yet, and games the book never opened a line on.
+- [ ] Run `/picks` against a real Supabase. It has never been executed — there
+      is no `.env.local` in the repo, so it typechecks and builds but has not
+      loaded a row. Do this before 8 Sep.
 - [ ] Build the real views — each stub under `src/components/views/` lists what
       it needs. Rough order of value: Dashboard, Standings, League Matrix,
       My History, Team Affinity, Settings, Admin.
-- [ ] Seeding a week's schedule from the Admin panel (`syncScheduleForWeek`).
+- [ ] Admin panel: a button calling `activateWeek(weekNumber)` (the manual
+      version of the Tuesday cron), and an input calling `setSpread(gameId,
+      rawSpread)` for any game that opened without a line. The service
+      functions exist; this is the UI for them.
+- [ ] Verify `weekly-rollover` against the live project once the schema is
+      applied — activate a week, confirm 16 games and 16 hooked spreads, then
+      re-run and confirm it changes nothing.
 - [ ] Delete `ViewStub.tsx` once the last view is real.
 
 ## Testing
@@ -64,8 +80,11 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ## Later
 
-- [ ] Automated score sync on a schedule. Today scores only move when a member
-      opens the app.
+- [ ] Automated score sync *during* the week. `weekly-rollover` now closes the
+      finished week on Tuesday, but between Thursday and Monday scores still
+      only move when a member opens the app. That is acceptable — members are
+      what drives it, and the Tuesday job is the backstop — but a scheduled
+      sync on game days would make results land without anyone watching.
 - [ ] Self-serve signup gated by invites.
 - [ ] Email notifications — pick reminder and post-week results.
 - [ ] Adopt the shared tokens in FrozenDegenerates: `node scripts/sync-tokens.mjs
@@ -73,6 +92,38 @@ Read `PLANNING.md` for why things are shaped the way they are.
       slots with the `ice` ramp, then rename its `ice-*` classes to `brand-*`.
 
 ---
+
+## Done (this session)
+
+- [x] `/picks` wired: `PicksPage` loads the week, its games and the member’s
+      picks, renders `PicksView`, and saves through `save_picks`. It also
+      triggers `sync-week` after first paint, which is how scores land between
+      Tuesdays.
+- [x] `GameCard` no longer offers a game with no line. It was showing “line not
+      posted” and still accepting the click, which `save_picks` and the RLS
+      policy would both have rejected at submit time.
+- [x] `getWeekOpensAt()` — the Tuesday a week’s sheet appears, for the screen
+      that has to say so. Same instant as the previous week’s rollover for every
+      week but the first, which is asserted rather than assumed.
+- [x] ESPN spike run and reconciled; every `TODO(spike)` in the schedule and
+      sync paths resolved against real payloads.
+- [x] **Scoring changed to 4x1 + 1x3.** `picks.confidence` now holds a point
+      value, not a rank. The old `unique (user_id, week_id, confidence)` had to
+      go — four identical 1s collide on it — and it was quietly also capping a
+      sheet at five rows, so `picks_one_bonus_per_week` and
+      `picks_enforce_sheet_shape` replace it. That cap matters: `insert` on
+      picks is granted to authenticated, so members are not forced through
+      `save_picks`.
+- [x] **Spreads captured on Tuesday, not at kickoff.** `weekly-rollover`
+      (scheduled) and `admin-activate-week` (manual) both call `activateWeek`;
+      `sync-week` no longer touches `games.spread`.
+- [x] `admin_set_spread` + `game_has_line`: a game with no line is seeded but
+      unpickable until an admin supplies one.
+- [x] Week rollover moved to Tuesday 18:00 ET.
+- [x] Security suite grew 40 → 52 assertions, all passing against Postgres 17.
+      Two pre-existing tests were passing for the wrong reason and now fail
+      closed on the rule they name.
+- [x] 78 unit tests passing; `npm run build` and `npm run typecheck` clean.
 
 ## Done (scaffolding session)
 

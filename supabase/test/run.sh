@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 #
-# Apply 0001_init.sql to a throwaway Postgres and run the security tests
-# against it. Every line of output should read `ok`; a `FAIL` is a real hole.
+# Apply every migration to a throwaway Postgres, in order, and run the security
+# tests against the result. Every line of output should read `ok`; a `FAIL` is a
+# real hole.
 #
-# This exists because the guards in 0001_init.sql are the whole security model,
+# In order matters: the live project already has 0001 applied, so what has to be
+# proven safe is the sequence it will actually go through, not a squashed schema
+# that no database ever had.
+#
+# This exists because those guards are the whole security model,
 # and a migration whose policies have only ever been *read* is a migration you
 # are trusting on vibes. The NHL app found four of these holes in production.
 #
@@ -28,8 +33,13 @@ psql -q -d postgres -c "drop database if exists $DB;" -c "create database $DB;"
 echo "==> Supabase fixture (roles, auth.users, auth.uid)"
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$HERE/00_supabase_fixture.sql"
 
-echo "==> Applying 0001_init.sql"
-psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$HERE/../migrations/0001_init.sql" >/dev/null
+# Every migration, in order. 0001 creates the schema; later ones amend it, and
+# the live project has already had 0001 applied -- so the test must exercise the
+# same sequence the real database went through, not a squashed version of it.
+for migration in "$HERE"/../migrations/*.sql; do
+  echo "==> Applying $(basename "$migration")"
+  psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$migration" >/dev/null
+done
 
 echo "==> Security tests"
 output=$(psql -v ON_ERROR_STOP=1 -d "$DB" -f "$HERE/01_security.sql" 2>&1)

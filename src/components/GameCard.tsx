@@ -16,8 +16,13 @@ import type { Game } from '../types';
  *      market line — see hookSpread() in lib/scoring.ts.
  *   2. PER-GAME LOCKING. This game closes at its own kickoff, which may be days
  *      before the rest of the sheet. A locked card shows its pick frozen rather
- *      than disappearing, because the confidence value it consumed is still
- *      spent for the week and the member needs to see why.
+ *      than disappearing, because the point value it consumed is still spent
+ *      for the week and the member needs to see why.
+ *   3. NO LINE, NO PICK. A game the book never opened has a null spread until
+ *      an admin sets one. It is shown, but it cannot be selected — save_picks
+ *      and the RLS policy both reject a pick on it, so offering the choice
+ *      would only produce an error at submit time. That is derived here from
+ *      the game itself rather than passed in, so no call site can forget it.
  */
 
 interface GameCardProps {
@@ -42,6 +47,9 @@ export const GameCard: React.FC<GameCardProps> = ({
   const away = TEAMS[game.awayTeamId];
   const kickoff = new Date(game.startTime);
 
+  /** No number to pick against yet. Distinct from locked, and it can be fixed. */
+  const awaitingLine = game.spread == null;
+
   const renderTeam = (teamId: string, isHome: boolean) => {
     const team = TEAMS[teamId];
     const picked = selectedTeamId === teamId;
@@ -49,14 +57,14 @@ export const GameCard: React.FC<GameCardProps> = ({
     return (
       <button
         type="button"
-        disabled={locked || !onSelectTeam}
+        disabled={locked || awaitingLine || !onSelectTeam}
         onClick={() => onSelectTeam?.(teamId)}
         className={[
           'flex flex-1 items-center gap-3 rounded-control border p-3 text-left transition-colors',
           picked
             ? 'border-brand-400 bg-brand-900/40'
             : 'border-line bg-surface hover:bg-surface-raised',
-          locked ? 'cursor-default opacity-70' : 'cursor-pointer'
+          locked || awaitingLine ? 'cursor-default opacity-70' : 'cursor-pointer'
         ].join(' ')}
       >
         <span
@@ -83,8 +91,8 @@ export const GameCard: React.FC<GameCardProps> = ({
       <header className="mb-3 flex items-center justify-between text-sm text-muted">
         <span>
           {formatETTime(kickoff, 'EEE h:mm a zzz')}
-          {game.spread == null && (
-            <span className="ml-2 text-faint">line not posted</span>
+          {awaitingLine && (
+            <span className="ml-2 text-faint">no line yet — cannot be picked</span>
           )}
         </span>
 

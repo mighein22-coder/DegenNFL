@@ -8,6 +8,7 @@ import { PUBLIC_ROUTES } from './routes';
 
 import { LoginView } from './components/views/LoginView';
 import { AuthCallbackView } from './components/views/AuthCallbackView';
+import { PicksPage } from './components/views/PicksPage';
 import { DashboardView } from './components/views/DashboardView';
 import { StandingsView } from './components/views/StandingsView';
 import { ResultsView } from './components/views/ResultsView';
@@ -15,7 +16,6 @@ import { TeamStatsView } from './components/views/TeamStatsView';
 import { MyHistoryView } from './components/views/MyHistoryView';
 import { SettingsView } from './components/views/SettingsView';
 import { AdminView } from './components/views/AdminView';
-import { ViewStub } from './components/views/ViewStub';
 
 /**
  * App shell: auth gate, routing, and the layout chrome. Nothing else.
@@ -84,23 +84,7 @@ const App: React.FC = () => {
       <main className="flex-1 p-4 pb-20 md:p-8 md:pb-8">
         <Routes>
           <Route path="/" element={<DashboardView />} />
-          <Route
-            path="/picks"
-            element={
-              /* PicksView needs a week, its games and the member's picks. Wiring
-                 that up is the next task — see TASKS.md. The component itself
-                 carries the per-game locking model. */
-              <ViewStub
-                title="Weekly Picks"
-                summary="Pick five games against the spread, ranked 1-5."
-                needs={[
-                  'Load the current week (getCurrentWeek), its games (getGamesForWeek) and the member’s picks (getPicksForWeek), then render the existing PicksView with them.',
-                  'Wire onSave to savePicks() — it sends only the unlocked picks; save_picks preserves the locked ones.',
-                  'Build the confidence selector described in the TODO inside PicksView.tsx.'
-                ]}
-              />
-            }
-          />
+          <Route path="/picks" element={<PicksPage />} />
           <Route path="/matrix" element={<ResultsView />} />
           <Route path="/affinity" element={<TeamStatsView />} />
           <Route path="/standings" element={<StandingsView />} />

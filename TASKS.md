@@ -33,12 +33,11 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ## Infrastructure
 
-- [ ] Apply `supabase/migrations/0002_scoring_and_activation.sql` to the
-      `degen-NFL-pool` project. 0001 is already applied there. 0002 stops and
-      names the rows if any pick holds a confidence outside {1, 3}, so it is
-      safe to run blind.
-- [ ] Run the verification queries at the bottom of that migration against the
-      live project, not just the test harness.
+- [X] Create the DegenNFL Supabase project (`degen-NFL-pool`) and apply
+      `supabase/migrations/0001_init.sql`.
+- [X] Apply `supabase/migrations/0002_scoring_and_activation.sql`.
+- [X] Run the verification queries against the live project, not just the test
+      harness.
 - [ ] Create the Netlify site, point it at this repo, set `VITE_SUPABASE_URL`,
       `VITE_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
       **No `VITE_`-prefixed secrets** — Vite inlines those into the public

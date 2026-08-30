@@ -38,7 +38,7 @@ Read `PLANNING.md` for why things are shaped the way they are.
 - [X] Apply `supabase/migrations/0002_scoring_and_activation.sql`.
 - [X] Run the verification queries against the live project, not just the test
       harness.
-- [ ] Create the Netlify site, point it at this repo, set `VITE_SUPABASE_URL`,
+- [X] Create the Netlify site, point it at this repo, set `VITE_SUPABASE_URL`,
       `VITE_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
       **No `VITE_`-prefixed secrets** — Vite inlines those into the public
       bundle, which is how the NHL app leaked its sync secret.

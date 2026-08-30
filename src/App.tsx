@@ -27,7 +27,16 @@ import { AdminView } from './components/views/AdminView';
  * was made one.
  */
 const App: React.FC = () => {
-  const { user, profile, loading, signUp, redeem } = useAuth();
+  const {
+    user,
+    profile,
+    loading,
+    profileError,
+    pendingRedeemError,
+    signUp,
+    redeem,
+    refreshProfile
+  } = useAuth();
   const navigate = useNavigate();
 
   // Captured at load, before supabase-js erases the URL fragment.
@@ -81,6 +90,35 @@ const App: React.FC = () => {
     );
   }
 
+  // The profile LOOKUP failed — not the same as having no profile. Showing the
+  // invite screen here would tell an existing member, on a dropped connection,
+  // that they are not in the pool; and their real code would then be refused
+  // with "you are already a member", stranding them on it.
+  if (profileError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
+        <p className="text-ink">Could not load your account.</p>
+        <p className="max-w-md font-mono text-sm text-faint">{profileError}</p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => void refreshProfile()}
+            className="rounded-control border border-line px-4 py-2 text-ink hover:bg-surface-raised"
+          >
+            Try again
+          </button>
+          <button
+            type="button"
+            onClick={signOut}
+            className="rounded-control px-4 py-2 text-muted underline"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Signed in, but not a member yet: they confirmed an email without redeeming
   // an invite, or mistyped the code. A profile IS membership since 0003, so
   // there is nothing of the pool to show them until they have one. Without
@@ -89,6 +127,7 @@ const App: React.FC = () => {
     return (
       <RedeemInviteView
         email={user.email ?? ''}
+        initialError={pendingRedeemError}
         onRedeem={redeem}
         onSignOut={signOut}
       />

@@ -119,9 +119,22 @@ keyed to it. See the header of `supabase/migrations/0003_invites.sql`.
 This matters more than it looks. `VITE_SUPABASE_ANON_KEY` is inlined into the
 JavaScript every visitor downloads, so anyone can call `auth.signUp` against
 the project. Before 0003 they could then insert their own profile and be in a
-pool played for money. Now creating an auth user gets them nothing: with no
-profile they see one screen asking for a code, and the foreign key on
-`picks.user_id` refuses everything else.
+pool played for money.
+
+Now creating an auth user gets them nothing — but that took more than blocking
+the profile insert. An adversarial review found that a signed-up stranger could
+still read every member’s email and role, and could insert rows into `weeks`
+and `games`. The last one mattered: `activateWeek` seeds the schedule with
+`upsert ... ignoreDuplicates`, so a row squatted on a real ESPN event id wins
+and the genuine fixture is skipped — squat one with the teams reversed and
+every pick on it is graded against an inverted line, with the rollover
+reporting no errors. Those policies now require membership, not merely a login.
+
+**Re-running `0001_init.sql` by itself undoes some of this.** It is full of
+`create or replace`, so it puts back looser versions of things 0002 and 0003
+tightened. Apply the whole sequence, in order, or none of it —
+`./supabase/test/run.sh` now re-applies 0001 on its own at the end and fails if
+anything reopened.
 
 ### Supabase settings this depends on
 

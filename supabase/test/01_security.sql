@@ -175,8 +175,12 @@ select pg_temp.must_fail(
   $$insert into public.games (week_id, home_team_id, away_team_id, start_time, home_score)
     values ('week-2026-18', 'SF', 'SEA', now() + interval '10 days', 40)$$);
 
-select pg_temp.must_pass(
-  'a member may still seed a schedule row',
+-- Seeding the schedule was a client action until the Tuesday rollover took it
+-- over under the service-role key. Leaving the grant behind let anyone with an
+-- auth account squat a real ESPN event id, which the rollover's upsert then
+-- skips -- so the fixture it grades is the attacker's, teams and all.
+select pg_temp.must_fail(
+  'not even a member may seed a schedule row any more',
   $$insert into public.games (week_id, home_team_id, away_team_id, start_time)
     values ('week-2026-18', 'SF', 'SEA', now() + interval '10 days')$$);
 
@@ -506,6 +510,33 @@ select pg_temp.assert(
     where id = '44444444-4444-4444-4444-444444444444'));
 
 \echo ''
+\echo '--- a signed-up stranger is not a member, and can reach nothing ---'
+
+-- Holding only an auth account -- which anyone can create, because the anon key
+-- is public and auth.signUp cannot be gated from the database -- must not be
+-- worth anything. Each of these WORKED before the policies were tightened.
+set local request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+
+select pg_temp.assert(
+  'a stranger cannot read the member roster',
+  (select count(*) = 0 from public.profiles));
+
+select pg_temp.must_fail(
+  'a stranger cannot create a week',
+  $$insert into public.weeks (id) values ('week-2026-07')$$);
+
+select pg_temp.must_fail(
+  'a stranger cannot squat a game on a real ESPN event id',
+  $$insert into public.games (week_id, espn_event_id, home_team_id, away_team_id, start_time)
+    values ('week-2026-18', '401872656', 'SEA', 'NE', now() + interval '30 days')$$);
+
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+select pg_temp.assert(
+  'and a member CAN still read the roster',
+  (select count(*) > 0 from public.profiles));
+
+\echo ''
 \echo '--- invites: the admin path, and redeeming one ---'
 
 set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
@@ -604,6 +635,25 @@ select pg_temp.assert(
   'the second claimant did not get a profile',
   (select count(*) = 0 from public.profiles
     where id = '66666666-6666-6666-6666-666666666666'));
+
+\echo ''
+\echo '--- invites: a member can actually be removed ---'
+
+-- `claimed_by ... on delete set null` fought the claim CHECK: nulling the
+-- column left claimed_at set, the CHECK rejected it, and so the DELETE failed.
+-- Not for the member, not for the service role, not for the dashboard's Delete
+-- user button. Nobody could leave the pool.
+reset role;
+
+select pg_temp.must_pass(
+  'deleting a member succeeds, cascading their claimed invite',
+  $$delete from public.profiles where id = '55555555-5555-5555-5555-555555555555'$$);
+
+select pg_temp.assert(
+  'the claimed invite went with them, rather than reverting to unclaimed',
+  (select count(*) = 0 from public.invites
+    where claimed_by = '55555555-5555-5555-5555-555555555555'
+       or (claimed_at is not null and claimed_by is null)));
 
 \echo ''
 rollback;

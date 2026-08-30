@@ -10,6 +10,20 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  /**
+   * Set only when the profile LOOKUP itself failed — a network drop, a 500, an
+   * expired token. Distinct from `profile === null`, which is the ordinary
+   * state of somebody who has not redeemed an invite yet. Collapsing the two
+   * tells a founding member on bad wifi that they need an invite to join.
+   */
+  const [profileError, setProfileError] = useState<string | null>(null);
+  /**
+   * A redemption that failed during signup, carried across the unmount. Once
+   * signUp creates a session, onAuthStateChange swaps the login screen out
+   * immediately — so an error raised after that point has nowhere to render
+   * and was simply lost, leaving a blank redeem form and no explanation.
+   */
+  const [pendingRedeemError, setPendingRedeemError] = useState<string | null>(null);
 
   useEffect(() => {
     // Get initial session
@@ -49,13 +63,15 @@ export function useAuth() {
 
       // A signed-in user with no profile row is a NORMAL state since 0003:
       // they have confirmed an email but not yet redeemed an invite. maybeSingle
-      // returns null rather than erroring, and the app shows them the redeem
-      // screen. Treating it as an error here is what would strand them.
+      // returns { data: null, error: null } for that, which is why the two are
+      // told apart here rather than both landing in the catch.
       if (error) throw error;
       setProfile((data as Profile | null) ?? null);
-    } catch (error) {
+      setProfileError(null);
+    } catch (error: any) {
       console.error('Error loading profile:', error);
       setProfile(null);
+      setProfileError(error?.message ?? String(error));
     } finally {
       setLoading(false);
     }
@@ -130,7 +146,18 @@ export function useAuth() {
       // No session means the address needs confirming first. Redemption waits.
       if (!data.session) return { needsConfirmation: true };
 
-      await redeemInvite(inviteCode, name);
+      // From here the login screen is already being unmounted, so an error
+      // thrown now would be set on a component nobody is looking at. Hand it
+      // to the redeem screen instead, which is where they are about to land.
+      try {
+        await redeemInvite(inviteCode, name);
+        setPendingRedeemError(null);
+      } catch (redeemError: any) {
+        setPendingRedeemError(
+          (redeemError?.message ?? String(redeemError)).replace(/^redeem_invite:\s*/, '')
+        );
+      }
+
       await loadProfile(data.user.id);
       return { needsConfirmation: false };
     } catch (error: any) {
@@ -144,6 +171,7 @@ export function useAuth() {
    */
   const redeem = async (inviteCode: string, name: string) => {
     if (!user) throw new Error('Not signed in');
+    setPendingRedeemError(null);
     await redeemInvite(inviteCode, name);
     await loadProfile(user.id);
   };
@@ -161,6 +189,8 @@ export function useAuth() {
     user,
     profile,
     loading,
+    profileError,
+    pendingRedeemError,
     signIn,
     signOut,
     signUp,

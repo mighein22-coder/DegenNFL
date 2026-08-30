@@ -3,6 +3,8 @@ import { Button } from '../Button';
 
 interface RedeemInviteViewProps {
   email: string;
+  /** A redemption that already failed during signup, so it is not lost. */
+  initialError?: string | null;
   onRedeem: (inviteCode: string, name: string) => Promise<void>;
   onSignOut: () => void;
 }
@@ -20,18 +22,24 @@ interface RedeemInviteViewProps {
  *     would be stranded: auth user created, no profile, no way to make one.
  *
  * It is also what an uninvited stranger sees, forever, if they sign up without
- * a code. They can see nothing and pick nothing — `picks.user_id` references
- * `profiles(id)`, so the database refuses — and this screen is the whole of the
- * app as far as they are concerned.
+ * a code — this screen is the whole of the app as far as they are concerned.
+ *
+ * That is only true because 0003 also tightened the policies around it. The
+ * foreign key on `picks.user_id` stops them PICKING, but on its own it left
+ * them able to read the whole member roster and to insert rows into `weeks`
+ * and `games` — including squatting a real fixture so the Tuesday rollover
+ * graded it against an inverted line. Being unable to pick was never the same
+ * as being unable to act.
  */
 export const RedeemInviteView: React.FC<RedeemInviteViewProps> = ({
   email,
+  initialError,
   onRedeem,
   onSignOut
 }) => {
   const [inviteCode, setInviteCode] = useState('');
   const [name, setName] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(initialError ?? '');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,7 +54,15 @@ export const RedeemInviteView: React.FC<RedeemInviteViewProps> = ({
       // redeem_invite raises messages written to be read ("that invite has
       // already been used"). Drop the function-name prefix, keep the sentence.
       const raw = err?.message ?? String(err);
-      setError(raw.replace(/^redeem_invite:\s*/, ''));
+      // Two tabs redeeming at once lose the race inside Postgres rather than
+      // in our pre-check, and surface as a primary-key violation. The outcome
+      // is right — no second profile, no code burned — but the message is not
+      // something to show anyone.
+      setError(
+        /duplicate key|profiles_pkey/i.test(raw)
+          ? 'You are already a member — try reloading the page.'
+          : raw.replace(/^redeem_invite:\s*/, '')
+      );
     } finally {
       setLoading(false);
     }

@@ -57,7 +57,8 @@ insert into auth.users (id, email) values
   ('33333333-3333-3333-3333-333333333333', 'boss@example.com'),
   ('44444444-4444-4444-4444-444444444444', 'stranger@example.com'),
   ('55555555-5555-5555-5555-555555555555', 'invited@example.com'),
-  ('66666666-6666-6666-6666-666666666666', 'latecomer@example.com');
+  ('66666666-6666-6666-6666-666666666666', 'latecomer@example.com'),
+  ('77777777-7777-7777-7777-777777777777', 'toolate@example.com');
 
 insert into public.profiles (id, email, name, role) values
   ('11111111-1111-1111-1111-111111111111', 'mallory@example.com', 'Mallory', 'member'),
@@ -599,11 +600,10 @@ select pg_temp.assert(
 set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
 
 select pg_temp.assert(
-  'the invite is now claimed',
-  (select claimed_by = '55555555-5555-5555-5555-555555555555'
-     and claimed_at is not null
-     from public.invites
-    where code = (select bound_code from pg_temp_codes)));
+  'the claim was recorded against the code',
+  (select count(*) = 1 from public.invite_claims
+    where code = (select bound_code from pg_temp_codes)
+      and user_id = '55555555-5555-5555-5555-555555555555'));
 
 -- Already a member, so this is refused before the code is even looked at.
 -- Passing a literal keeps that unambiguous: redeem_invite checks membership
@@ -614,9 +614,9 @@ select pg_temp.must_fail(
   'an existing member cannot redeem a second invite',
   $$select 1 from public.redeem_invite('ANYCODE12345', 'Greedy')$$);
 
--- Now the single-use rule, tested by somebody who is neither a member nor
--- excluded by an email binding: the open code, and a brand new account. The
--- ONLY thing that can refuse this is the code already being spent.
+-- THE GROUP KEY. One code goes to the whole pool and everybody signs
+-- themselves up with it, so a second person redeeming the same code is the
+-- ordinary case rather than an attack.
 set local request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
 
 select pg_temp.must_pass(
@@ -626,15 +626,86 @@ select pg_temp.must_pass(
 
 set local request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
 
-select pg_temp.must_fail(
-  'the same code cannot be redeemed twice',
+select pg_temp.must_pass(
+  'and by the next person too -- the code is not spent',
   format($$select 1 from public.redeem_invite(%L, 'Latecomer')$$,
          (select open_code from pg_temp_open)));
 
+set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
 select pg_temp.assert(
-  'the second claimant did not get a profile',
+  'both claims are recorded against the one code',
+  (select count(*) = 2 from public.invite_claims
+    where code = (select open_code from pg_temp_open)));
+
+-- What stops ONE PERSON using it twice is unique (user_id) on invite_claims
+-- and the profile check, not the state of the code.
+set local request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+
+select pg_temp.must_fail(
+  'but one person cannot claim the same code twice',
+  format($$select 1 from public.redeem_invite(%L, 'Latecomer Again')$$,
+         (select open_code from pg_temp_open)));
+
+\echo ''
+\echo '--- invites: expiry and revocation are what close a shared code ---'
+
+-- An uncapped code has to shut on its own, or it is a door left open.
+set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+create temp table pg_temp_short as
+  select (public.admin_create_invite()).code as short_code;
+
+-- Backdated rather than slept through. `now()` is TRANSACTION start time in
+-- Postgres and this whole file is one transaction, so no amount of pg_sleep
+-- makes a code expire here -- the redeem would compare against the same
+-- instant that minted it. In production each redemption is its own
+-- transaction, so the clock does advance; this reproduces the state rather
+-- than the passage of time.
+reset role;
+update public.invites
+   set expires_at = now() - interval '1 minute'
+ where code = (select short_code from pg_temp_short);
+set local role authenticated;
+
+set local request.jwt.claim.sub = '77777777-7777-7777-7777-777777777777';
+
+select pg_temp.must_fail(
+  'an expired code is refused',
+  format($$select 1 from public.redeem_invite(%L, 'Too Late')$$,
+         (select short_code from pg_temp_short)));
+
+-- And the admin can shut one early, the moment everybody is in.
+set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+create temp table pg_temp_revoked as
+  select (public.admin_create_invite()).code as revoked_code;
+
+select pg_temp.must_pass(
+  'an admin can revoke a code early',
+  format($$select 1 from public.admin_revoke_invite(%L)$$,
+         (select revoked_code from pg_temp_revoked)));
+
+select pg_temp.must_fail(
+  'revoking twice is refused rather than silently doing nothing',
+  format($$select 1 from public.admin_revoke_invite(%L)$$,
+         (select revoked_code from pg_temp_revoked)));
+
+set local request.jwt.claim.sub = '77777777-7777-7777-7777-777777777777';
+
+select pg_temp.must_fail(
+  'a revoked code is refused',
+  format($$select 1 from public.redeem_invite(%L, 'Too Late')$$,
+         (select revoked_code from pg_temp_revoked)));
+
+select pg_temp.must_fail(
+  'a member cannot revoke a code',
+  $$select 1 from public.admin_revoke_invite('ANYTHING1234')$$);
+
+select pg_temp.assert(
+  'nobody got in on the expired or revoked codes',
   (select count(*) = 0 from public.profiles
-    where id = '66666666-6666-6666-6666-666666666666'));
+    where id = '77777777-7777-7777-7777-777777777777'));
 
 \echo ''
 \echo '--- invites: a member can actually be removed ---'
@@ -650,10 +721,14 @@ select pg_temp.must_pass(
   $$delete from public.profiles where id = '55555555-5555-5555-5555-555555555555'$$);
 
 select pg_temp.assert(
-  'the claimed invite went with them, rather than reverting to unclaimed',
-  (select count(*) = 0 from public.invites
-    where claimed_by = '55555555-5555-5555-5555-555555555555'
-       or (claimed_at is not null and claimed_by is null)));
+  'their claim went with them',
+  (select count(*) = 0 from public.invite_claims
+    where user_id = '55555555-5555-5555-5555-555555555555'));
+
+select pg_temp.assert(
+  'but the code itself survives, still open to the rest of the pool',
+  (select count(*) = 1 from public.invites
+    where code = (select bound_code from pg_temp_codes)));
 
 \echo ''
 rollback;

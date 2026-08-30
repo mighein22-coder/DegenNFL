@@ -56,9 +56,10 @@ Read `PLANNING.md` for why things are shaped the way they are.
       `redeem_invite()` the only way a profile is created, which closes a real
       hole: with signups enabled anyone could previously sign up and insert
       their own profile, and a profile is membership.
-- [ ] Admin UI for invites. `createInvite()` / `listInvites()` exist and are
-      admin-only in the database; until there is a button, codes are minted
-      from the SQL editor (see `docs/OPERATIONS.md`).
+- [ ] Admin UI for invites. `createInvite()`, `revokeInvite()`, `listInvites()`
+      and `listInviteClaims()` exist and are admin-only in the database. Less
+      urgent than it was: one reusable code covers the whole pool, so the SQL
+      path is a single statement for the season rather than one per member.
 - [ ] Check the Supabase project has email signups ENABLED. Self-serve signup
       cannot work without it, and nothing in the repo can verify it.
 - [ ] Run `/picks` against a real Supabase. It has never been executed — there

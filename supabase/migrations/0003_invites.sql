@@ -106,31 +106,54 @@ create table if not exists public.invites (
   created_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
 
-  -- Optional. A code with no expiry is valid until used.
+  -- REQUIRED in practice: admin_create_invite defaults it to 14 days out. An
+  -- uncapped code that never expires is a door left open, and the whole point
+  -- of the shared key is that it closes itself without anyone remembering to
+  -- close it.
   expires_at timestamptz,
 
-  -- CASCADE, not SET NULL. Nulling `claimed_by` while leaving `claimed_at` set
-  -- violates the CHECK below, which makes the *delete* fail -- so removing a
-  -- member became impossible for anyone, service role included, including via
-  -- the Supabase dashboard's Delete user button. Deleting the invite along
-  -- with the member is the coherent reading: the code was spent on somebody
-  -- who is no longer here, and it must not come back as unclaimed.
-  claimed_by uuid references public.profiles(id) on delete cascade,
-  claimed_at timestamptz,
-
-  -- Claimed is both columns or neither; half a claim is not a state.
-  constraint invites_claim_is_complete
-    check ((claimed_by is null) = (claimed_at is null)),
-
-  -- One invite per person. Unreachable through the app -- two claims would mean
-  -- two profiles with one id, and profiles_pkey rejects that first -- so this
-  -- earns its place only against hand-written SQL in the dashboard, which
-  -- OPERATIONS.md does send admins to.
-  unique (claimed_by)
+  -- Set to shut a code early -- the moment everyone is in, say. Separate from
+  -- deleting it, so the claims that went through it keep their reference.
+  revoked_at timestamptz
 );
 
-create index if not exists invites_unclaimed_idx
-  on public.invites (email) where claimed_by is null;
+/*
+ * Who came in on which code.
+ *
+ * A code is REUSABLE: one key goes to the group email and everybody signs
+ * themselves up with it, which is how the pool actually communicates. So a
+ * claim is no longer a pair of columns on the invite row -- there are many of
+ * them per code, and they need somewhere to live.
+ *
+ * `unique (user_id)` is the rule that survived from the single-use design and
+ * still matters: one person joins once, on one code.
+ *
+ * Cascading on both sides is deliberate. Delete a member and their claim goes
+ * with them, leaving the code itself untouched for everyone else -- which is
+ * exactly what the old `claimed_by ... on delete set null` could not express,
+ * and why removing a member used to fail outright.
+ */
+create table if not exists public.invite_claims (
+  code text not null references public.invites(code) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  claimed_at timestamptz not null default now(),
+
+  primary key (code, user_id),
+  unique (user_id)
+);
+
+alter table public.invite_claims enable row level security;
+
+revoke all on public.invite_claims from anon, authenticated;
+grant select on public.invite_claims to authenticated;
+
+-- Admins only, same as invites: who joined on which code is roster metadata,
+-- not something a member needs.
+drop policy if exists invite_claims_select_admin on public.invite_claims;
+create policy invite_claims_select_admin
+  on public.invite_claims for select to authenticated
+  using (public.is_admin());
+
 
 alter table public.invites enable row level security;
 
@@ -225,9 +248,10 @@ security definer
 set search_path = public
 as $$
 declare
-  v_invite public.invites;
-  v_code   text;
-  v_email  text := nullif(lower(trim(coalesce(p_email, ''))), '');
+  v_invite     public.invites;
+  v_code       text;
+  v_expires_at timestamptz;
+  v_email      text := nullif(lower(trim(coalesce(p_email, ''))), '');
 begin
   if not public.is_admin() then
     raise exception 'admin_create_invite: admins only';
@@ -241,6 +265,22 @@ begin
     raise exception 'admin_create_invite: expiry is already in the past';
   end if;
 
+  -- Codes are UNCAPPED: any number of people can redeem one until it expires
+  -- or is revoked. That is the point -- one key to the group email beats
+  -- twelve codes and twelve messages, and it is what makes signup genuinely
+  -- self-serve rather than making the admin the bottleneck.
+  --
+  -- Which is exactly why it must not be open-ended. An expiry is defaulted
+  -- rather than demanded, so a hurried admin cannot mint a permanent door by
+  -- omission. Pass one explicitly to override; pass a far-future date if you
+  -- genuinely want a long-lived code.
+  v_expires_at := coalesce(p_expires_at, now() + interval '14 days');
+
+  -- Binding to an address is what makes a code PERSONAL rather than shared:
+  -- uncapped means nothing when only one person may use it. So the two shapes
+  -- are the same mechanism -- leave the email off for the group key, set it for
+  -- a single named late joiner.
+  --
   -- Refuse to invite somebody who is already in. Cheap, and it stops a second
   -- code being minted for a member who simply forgot their password.
   if v_email is not null and exists (
@@ -258,7 +298,7 @@ begin
   v_code := public.generate_invite_code();
 
   insert into public.invites (code, email, created_by, expires_at)
-  values (v_code, v_email, auth.uid(), p_expires_at)
+  values (v_code, v_email, auth.uid(), v_expires_at)
   returning * into v_invite;
 
   return v_invite;
@@ -269,7 +309,50 @@ revoke all on function public.admin_create_invite(text, timestamptz) from public
 grant execute on function public.admin_create_invite(text, timestamptz) to authenticated;
 
 comment on function public.admin_create_invite(text, timestamptz) is
-  'Admin-only. Mints a single-use invite code, optionally bound to one email address.';
+  'Admin-only. Mints a reusable invite code, expiring in 14 days unless told otherwise. Bind it to an email address to make it personal instead.';
+
+-- ---------------------------------------------------------------------------
+-- admin_revoke_invite(code)
+--
+--    Shut a code before its expiry. The counterpart to uncapped codes: the
+--    expiry is the safety net, this is the deliberate act -- everybody is in,
+--    close the door now rather than leaving it ajar for another ten days.
+--
+--    Claims already made are untouched. Revoking is not un-inviting.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.admin_revoke_invite(p_code text)
+returns public.invites
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_invite public.invites;
+begin
+  if not public.is_admin() then
+    raise exception 'admin_revoke_invite: admins only';
+  end if;
+
+  update public.invites
+     set revoked_at = now()
+   where code = public.normalise_invite_code(p_code)
+     and revoked_at is null
+  returning * into v_invite;
+
+  if v_invite.code is null then
+    raise exception 'admin_revoke_invite: no such code, or it is already revoked';
+  end if;
+
+  return v_invite;
+end;
+$$;
+
+revoke all on function public.admin_revoke_invite(text) from public;
+grant execute on function public.admin_revoke_invite(text) to authenticated;
+
+comment on function public.admin_revoke_invite(text) is
+  'Admin-only. Closes a code early. Claims already made are unaffected.';
 
 -- ---------------------------------------------------------------------------
 -- 5. redeem_invite(code, name)
@@ -320,7 +403,10 @@ begin
     raise exception 'redeem_invite: your account has no email address';
   end if;
 
-  -- Lock the row: two tabs redeeming the same code must not both win.
+  -- Still locked, though nothing about the code changes now. Two people
+  -- redeeming the same group key at the same instant is the ordinary case, and
+  -- both should succeed; the lock is what serialises the expiry and revocation
+  -- checks against an admin revoking mid-redemption.
   select * into v_invite
     from public.invites
    where code = v_code
@@ -330,8 +416,11 @@ begin
     raise exception 'redeem_invite: that invite code is not valid';
   end if;
 
-  if v_invite.claimed_by is not null then
-    raise exception 'redeem_invite: that invite has already been used';
+  -- No "already used" check: a code is reusable by design. What stops one
+  -- PERSON using it twice is the profile check above and unique (user_id) on
+  -- invite_claims, not the state of the code.
+  if v_invite.revoked_at is not null then
+    raise exception 'redeem_invite: that invite is no longer open';
   end if;
 
   if v_invite.expires_at is not null and v_invite.expires_at <= now() then
@@ -352,10 +441,8 @@ begin
   values (v_user_id, v_email, v_name)
   returning * into v_profile;
 
-  update public.invites
-     set claimed_by = v_user_id,
-         claimed_at = now()
-   where code = v_invite.code;
+  insert into public.invite_claims (code, user_id)
+  values (v_invite.code, v_user_id);
 
   return v_profile;
 end;

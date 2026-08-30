@@ -1,5 +1,12 @@
 import { supabase } from './supabase';
-import type { GameRow, InviteRow, PickRow, Profile, WeekRow } from './supabase';
+import type {
+  GameRow,
+  InviteClaimRow,
+  InviteRow,
+  PickRow,
+  Profile,
+  WeekRow
+} from './supabase';
 import { buildWeekId, getCurrentWeekNumber } from './timezone';
 import { SEASON } from '../constants';
 import type { Game, Pick, Week } from '../types';
@@ -97,10 +104,18 @@ export async function redeemInvite(code: string, name: string): Promise<Profile>
 }
 
 /**
- * Mint a single-use invite code. Admin-only, enforced in the database.
+ * Mint an invite code. Admin-only, enforced in the database.
  *
- * Pass an email to bind the code to one address, which makes it useless to
- * anyone else who sees it. Leave it out for a code you hand over in person.
+ * The code is REUSABLE: send one to the pool’s group email and everybody signs
+ * themselves up with it. That is the difference between signup being genuinely
+ * self-serve and the admin being a bottleneck for every member.
+ *
+ * Because it is uncapped it has to close on its own, so the expiry defaults to
+ * 14 days out. Pass one explicitly to change that, and `revokeInvite` to shut
+ * it the moment everybody is in.
+ *
+ * Pass an email to bind it to one address instead — that is what makes a code
+ * personal, and it is the right shape for a single late joiner.
  */
 export async function createInvite(
   email?: string,
@@ -115,7 +130,20 @@ export async function createInvite(
   return data as InviteRow;
 }
 
-/** Every invite, outstanding and spent. Returns nothing for a non-admin. */
+/**
+ * Close a code early, before its expiry.
+ *
+ * The counterpart to codes being uncapped: the expiry is the safety net, this
+ * is the deliberate act. Claims already made are untouched — revoking is not
+ * un-inviting anybody.
+ */
+export async function revokeInvite(code: string): Promise<InviteRow> {
+  const { data, error } = await supabase.rpc('admin_revoke_invite', { p_code: code });
+  if (error) throw error;
+  return data as InviteRow;
+}
+
+/** Every invite, open and closed. Returns nothing for a non-admin. */
 export async function listInvites(): Promise<InviteRow[]> {
   const { data, error } = await supabase
     .from('invites')
@@ -124,6 +152,17 @@ export async function listInvites(): Promise<InviteRow[]> {
 
   if (error) throw error;
   return (data ?? []) as InviteRow[];
+}
+
+/** Who joined on which code. Admins only; empty for everyone else. */
+export async function listInviteClaims(): Promise<InviteClaimRow[]> {
+  const { data, error } = await supabase
+    .from('invite_claims')
+    .select('*')
+    .order('claimed_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as InviteClaimRow[];
 }
 
 // ---------------------------------------------------------------------------

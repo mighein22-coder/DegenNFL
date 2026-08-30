@@ -147,35 +147,66 @@ Authentication → Providers → Email:
   in, and is asked for the code once more. That path is deliberate, not a
   workaround.
 
-### Minting an invite
+### Opening the pool: one code for everybody
 
-Until the Admin panel has a button for it, from the SQL editor:
+A code is **reusable**. Mint one, send it to the group email, and everybody
+signs themselves up with it. That is one SQL statement for the whole season
+rather than one per member, and it is what makes signup genuinely self-serve
+instead of making you the bottleneck.
 
 ```sql
--- Bound to one address: useless to anyone else who sees the code.
+select code, expires_at from public.admin_create_invite();
+```
+
+Codes are 12 characters and case/space/dash insensitive when redeemed, so it
+survives being typed badly. Send it with the site URL; members pick **Create
+your account** on the login screen.
+
+**It expires in 14 days unless you say otherwise.** Being uncapped is the
+trade: anyone holding the code can join, so it has to shut on its own rather
+than depending on you to remember. Set your own window with a second argument:
+
+```sql
+select code, expires_at from public.admin_create_invite(null, now() + interval '30 days');
+```
+
+And close it early once everybody is in — the expiry is the safety net, this is
+the deliberate act:
+
+```sql
+select public.admin_revoke_invite('ABCD1234EFGH');
+```
+
+### Inviting one person later
+
+Bind a code to an address. That is what makes it personal — uncapped means
+nothing when only one address may use it, and an intercepted code is useless to
+anyone else:
+
+```sql
 select code from public.admin_create_invite('friend@example.com');
-
--- Or an open code, to hand over in person.
-select code from public.admin_create_invite();
-
--- Expiring in a week.
-select code from public.admin_create_invite('friend@example.com', now() + interval '7 days');
 ```
 
-Codes are single-use, 12 characters, and case/space/dash insensitive when
-redeemed. Send the member the code and the site URL; they pick **Create your
-account** on the login screen.
+This refuses an address that is already a member, so a forgotten password does
+not turn into a second account. Send them to **Forgot password?** instead.
 
-`admin_create_invite` refuses to invite an address that is already a member, so
-a forgotten password does not turn into a second account. Send them to **Forgot
-password?** instead.
-
-To see what is outstanding:
+### Seeing what is open, and who came in
 
 ```sql
-select code, email, created_at, expires_at, claimed_by, claimed_at
+select code, email, created_at, expires_at, revoked_at
   from public.invites order by created_at desc;
+
+select c.code, p.name, p.email, c.claimed_at
+  from public.invite_claims c
+  join public.profiles p on p.id = c.user_id
+ order by c.claimed_at desc;
 ```
+
+### Removing a member
+
+Delete their profile; their claim goes with them and the code stays open for
+everyone else. Deleting the auth user from Authentication → Users does the same
+thing by cascade.
 
 ### The first admin
 

@@ -29,6 +29,37 @@ export type Profile = {
   updated_at: string;
 };
 
+/**
+ * An invite: the only route to a profile — see 0003_invites.sql.
+ *
+ * REUSABLE. One code goes to the whole pool and everyone signs themselves up
+ * with it, which is how the group actually communicates. What closes it is the
+ * expiry, or an admin revoking it — not the first person through.
+ *
+ * Setting `email` is what makes a code personal instead: uncapped means nothing
+ * when only one address may use it.
+ *
+ * Never readable by a member; the RLS policy shows rows to admins only.
+ */
+export type InviteRow = {
+  code: string;
+  /** When set, only this address may redeem it. Lower case. */
+  email: string | null;
+  created_by: string | null;
+  created_at: string;
+  /** Defaulted to 14 days out at creation. An open-ended code is a door left open. */
+  expires_at: string | null;
+  /** Set to close a code early, once everyone is in. */
+  revoked_at: string | null;
+};
+
+/** Who came in on which code. One row per member; admins only. */
+export type InviteClaimRow = {
+  code: string;
+  user_id: string;
+  claimed_at: string;
+};
+
 export type WeekRow = {
   id: string;
   season: number;

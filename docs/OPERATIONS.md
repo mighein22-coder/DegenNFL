@@ -109,6 +109,118 @@ against the deployed site after any change here.
 
 ---
 
+## Adding members
+
+The pool is invite-only, and that is enforced by the database rather than by
+the UI. `redeem_invite()` is the only thing that can create a `profiles` row,
+and a profile row **is** membership — standings read it, and picks are foreign
+keyed to it. See the header of `supabase/migrations/0003_invites.sql`.
+
+This matters more than it looks. `VITE_SUPABASE_ANON_KEY` is inlined into the
+JavaScript every visitor downloads, so anyone can call `auth.signUp` against
+the project. Before 0003 they could then insert their own profile and be in a
+pool played for money.
+
+Now creating an auth user gets them nothing — but that took more than blocking
+the profile insert. An adversarial review found that a signed-up stranger could
+still read every member’s email and role, and could insert rows into `weeks`
+and `games`. The last one mattered: `activateWeek` seeds the schedule with
+`upsert ... ignoreDuplicates`, so a row squatted on a real ESPN event id wins
+and the genuine fixture is skipped — squat one with the teams reversed and
+every pick on it is graded against an inverted line, with the rollover
+reporting no errors. Those policies now require membership, not merely a login.
+
+**Re-running `0001_init.sql` by itself undoes some of this.** It is full of
+`create or replace`, so it puts back looser versions of things 0002 and 0003
+tightened. Apply the whole sequence, in order, or none of it —
+`./supabase/test/run.sh` now re-applies 0001 on its own at the end and fails if
+anything reopened.
+
+### Supabase settings this depends on
+
+Authentication → Providers → Email:
+
+* **Enable signup must be ON.** With it off, self-serve signup cannot work at
+  all and you are back to creating users by hand.
+* **Confirm email** may be either. With it on, `auth.signUp` returns no session,
+  so the invite cannot be redeemed at that moment — the member confirms, signs
+  in, and is asked for the code once more. That path is deliberate, not a
+  workaround.
+
+### Opening the pool: one code for everybody
+
+A code is **reusable**. Mint one, send it to the group email, and everybody
+signs themselves up with it. That is one SQL statement for the whole season
+rather than one per member, and it is what makes signup genuinely self-serve
+instead of making you the bottleneck.
+
+```sql
+select code, expires_at from public.admin_create_invite();
+```
+
+Codes are 12 characters and case/space/dash insensitive when redeemed, so it
+survives being typed badly. Send it with the site URL; members pick **Create
+your account** on the login screen.
+
+**It expires in 14 days unless you say otherwise.** Being uncapped is the
+trade: anyone holding the code can join, so it has to shut on its own rather
+than depending on you to remember. Set your own window with a second argument:
+
+```sql
+select code, expires_at from public.admin_create_invite(null, now() + interval '30 days');
+```
+
+And close it early once everybody is in — the expiry is the safety net, this is
+the deliberate act:
+
+```sql
+select public.admin_revoke_invite('ABCD1234EFGH');
+```
+
+### Inviting one person later
+
+Bind a code to an address. That is what makes it personal — uncapped means
+nothing when only one address may use it, and an intercepted code is useless to
+anyone else:
+
+```sql
+select code from public.admin_create_invite('friend@example.com');
+```
+
+This refuses an address that is already a member, so a forgotten password does
+not turn into a second account. Send them to **Forgot password?** instead.
+
+### Seeing what is open, and who came in
+
+```sql
+select code, email, created_at, expires_at, revoked_at
+  from public.invites order by created_at desc;
+
+select c.code, p.name, p.email, c.claimed_at
+  from public.invite_claims c
+  join public.profiles p on p.id = c.user_id
+ order by c.claimed_at desc;
+```
+
+### Removing a member
+
+Delete their profile; their claim goes with them and the code stays open for
+everyone else. Deleting the auth user from Authentication → Users does the same
+thing by cascade.
+
+### The first admin
+
+Nobody can create the first profile through the app, because redeeming needs an
+invite and minting one needs an admin. Bootstrap it once from the SQL editor,
+after creating the auth user in Authentication → Users:
+
+```sql
+insert into public.profiles (id, email, name, role)
+select id, email, 'Your Name', 'admin' from auth.users where email = 'you@example.com';
+```
+
+---
+
 ## Running a season
 
 ### Before week 1

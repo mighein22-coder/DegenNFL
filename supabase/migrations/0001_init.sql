@@ -33,7 +33,14 @@
 --   * `games.spread` must end in a half point. That CHECK is what makes every
 --     pick a win or a loss, which is why nothing here knows about pushes.
 --
--- Safe to run more than once.
+-- Safe to re-run ONLY as part of the whole sequence: 0001, then 0002, then
+-- 0003, in order. Later migrations tighten things this file creates -- the
+-- 1..5 confidence check, save_picks, picks_insert_own -- and `create or
+-- replace` here happily puts the looser version back. Running this file alone
+-- against a live database silently reverts them.
+--
+-- The membership-critical grants are no longer here at all, precisely so that
+-- mistake cannot reopen the pool. See section 0 of 0003_invites.sql.
 -- ============================================================================
 
 begin;
@@ -239,6 +246,28 @@ as $$
 $$;
 
 /*
+ * Is the caller a member of the pool at all?
+ *
+ * A `profiles` row IS membership -- standings read it and picks are foreign
+ * keyed to it -- and since 0003 the only way to get one is to redeem an
+ * invite. Anybody can create an auth user, though: that is Supabase's own
+ * signup endpoint and it cannot be gated from here. So "authenticated" and
+ * "member" are different things, and every policy has to say which it means.
+ *
+ * SECURITY DEFINER for the same reason as is_admin(): it is evaluated inside
+ * policies on the very table it reads.
+ */
+create or replace function public.is_member()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.profiles p where p.id = auth.uid());
+$$;
+
+/*
  * Has a pick on this game closed?
  *
  * TWO conditions, either sufficient:
@@ -441,13 +470,16 @@ alter table public.picks    enable row level security;
 drop policy if exists profiles_select_all on public.profiles;
 create policy profiles_select_all
   on public.profiles for select to authenticated
-  using (true); -- standings need every member's name and avatar
+  -- Standings need every member's name and avatar. MEMBERS, though: anyone
+  -- can create an auth user with the public anon key, and without this an
+  -- uninvited stranger could read the whole roster and see which address
+  -- belongs to the admin.
+  using (public.is_member());
 
--- Signup inserts its own row. (FrozenDegenerates 0002.)
-drop policy if exists profiles_insert_self on public.profiles;
-create policy profiles_insert_self
-  on public.profiles for insert to authenticated
-  with check (auth.uid() = id);
+-- NO INSERT POLICY, and no insert grant below. A profile is membership, so it
+-- is created only by redeem_invite() -- see 0003_invites.sql. This is where
+-- `profiles_insert_self` used to be; it is gone rather than dropped later, so
+-- that re-running this file cannot put it back.
 
 drop policy if exists profiles_update_self on public.profiles;
 create policy profiles_update_self
@@ -461,10 +493,12 @@ create policy weeks_select_all
   on public.weeks for select to authenticated using (true);
 
 -- Seeding a week stays a normal member action: the app creates the row the
--- first time anyone opens a new week. The trigger above makes that safe.
+-- first time anyone opens a new week, and the trigger above derives
+-- everything that matters. But it must be a MEMBER -- `with check (true)` let
+-- anyone holding an auth account create weeks in a pool they had not joined.
 drop policy if exists weeks_insert_authenticated on public.weeks;
 create policy weeks_insert_authenticated
-  on public.weeks for insert to authenticated with check (true);
+  on public.weeks for insert to authenticated with check (public.is_member());
 
 -- Changing an existing week is an admin action, and reaches `status` only.
 drop policy if exists weeks_update_admin on public.weeks;
@@ -480,9 +514,16 @@ drop policy if exists games_select_all on public.games;
 create policy games_select_all
   on public.games for select to authenticated using (true);
 
+-- NO INSERT POLICY, and no insert grant below.
+--
+-- Seeding the schedule used to be a client action. It is not any more: since
+-- 0002 the Tuesday rollover seeds games under the service-role key, so this
+-- grant was dead weight -- and worse than dead. `activateWeek` upserts on
+-- (week_id, espn_event_id) with ignoreDuplicates, so a row squatted on a real
+-- ESPN event id WINS and the genuine fixture is skipped. Squat one with the
+-- teams reversed and every pick on that game is graded against an inverted
+-- line.
 drop policy if exists games_insert_authenticated on public.games;
-create policy games_insert_authenticated
-  on public.games for insert to authenticated with check (true);
 
 -- No UPDATE or DELETE policy for clients. (FrozenDegenerates 0007: `games`
 -- carried `using (true)` for role `public`, so a logged-out visitor could
@@ -545,16 +586,15 @@ grant select on public.weeks, public.games, public.picks, public.profiles
 grant insert (id, status) on public.weeks to authenticated;
 grant update (status)     on public.weeks to authenticated;
 
--- Schedule columns only. Not scores, not the spread.
-grant insert (week_id, espn_event_id, home_team_id, away_team_id, start_time)
-  on public.games to authenticated;
+-- No games grant: the schedule is seeded server-side. See the games policies.
 
 -- The five pick columns. Not points_earned, not result.
 grant insert (user_id, week_id, game_id, selected_team_id, confidence)
   on public.picks to authenticated;
 grant delete on public.picks to authenticated;
 
-grant insert (id, email, name, avatar) on public.profiles to authenticated;
+-- No profiles INSERT grant: redeem_invite() is the only thing that creates a
+-- profile, and it is SECURITY DEFINER so it needs no grant of its own.
 grant update (name, avatar, updated_at) on public.profiles to authenticated;
 
 grant insert, update, delete on public.weeks, public.games, public.picks, public.profiles

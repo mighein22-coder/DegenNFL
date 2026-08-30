@@ -52,6 +52,7 @@ Read `PLANNING.md` for why things are shaped the way they are.
 - [x] Wire `/picks`. `PicksPage` is the container; `PicksView` stays pure.
       Covers both non-error empty states: a week whose schedule is not captured
       yet, and games the book never opened a line on.
+- [ ] Self-serve signup gated by invites.
 - [ ] Run `/picks` against a real Supabase. It has never been executed — there
       is no `.env.local` in the repo, so it typechecks and builds but has not
       loaded a row. Do this before 8 Sep.
@@ -84,7 +85,6 @@ Read `PLANNING.md` for why things are shaped the way they are.
       only move when a member opens the app. That is acceptable — members are
       what drives it, and the Tuesday job is the backstop — but a scheduled
       sync on game days would make results land without anyone watching.
-- [ ] Self-serve signup gated by invites.
 - [ ] Email notifications — pick reminder and post-week results.
 - [ ] Adopt the shared tokens in FrozenDegenerates: `node scripts/sync-tokens.mjs
       --push ../FrozenDegenerates`, add a `brand.css` there filling the same

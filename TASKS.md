@@ -52,7 +52,15 @@ Read `PLANNING.md` for why things are shaped the way they are.
 - [x] Wire `/picks`. `PicksPage` is the container; `PicksView` stays pure.
       Covers both non-error empty states: a week whose schedule is not captured
       yet, and games the book never opened a line on.
-- [ ] Self-serve signup gated by invites.
+- [x] Self-serve signup gated by invites. `0003_invites.sql` makes
+      `redeem_invite()` the only way a profile is created, which closes a real
+      hole: with signups enabled anyone could previously sign up and insert
+      their own profile, and a profile is membership.
+- [ ] Admin UI for invites. `createInvite()` / `listInvites()` exist and are
+      admin-only in the database; until there is a button, codes are minted
+      from the SQL editor (see `docs/OPERATIONS.md`).
+- [ ] Check the Supabase project has email signups ENABLED. Self-serve signup
+      cannot work without it, and nothing in the repo can verify it.
 - [ ] Run `/picks` against a real Supabase. It has never been executed — there
       is no `.env.local` in the repo, so it typechecks and builds but has not
       loaded a row. Do this before 8 Sep.

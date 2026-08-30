@@ -109,6 +109,74 @@ against the deployed site after any change here.
 
 ---
 
+## Adding members
+
+The pool is invite-only, and that is enforced by the database rather than by
+the UI. `redeem_invite()` is the only thing that can create a `profiles` row,
+and a profile row **is** membership — standings read it, and picks are foreign
+keyed to it. See the header of `supabase/migrations/0003_invites.sql`.
+
+This matters more than it looks. `VITE_SUPABASE_ANON_KEY` is inlined into the
+JavaScript every visitor downloads, so anyone can call `auth.signUp` against
+the project. Before 0003 they could then insert their own profile and be in a
+pool played for money. Now creating an auth user gets them nothing: with no
+profile they see one screen asking for a code, and the foreign key on
+`picks.user_id` refuses everything else.
+
+### Supabase settings this depends on
+
+Authentication → Providers → Email:
+
+* **Enable signup must be ON.** With it off, self-serve signup cannot work at
+  all and you are back to creating users by hand.
+* **Confirm email** may be either. With it on, `auth.signUp` returns no session,
+  so the invite cannot be redeemed at that moment — the member confirms, signs
+  in, and is asked for the code once more. That path is deliberate, not a
+  workaround.
+
+### Minting an invite
+
+Until the Admin panel has a button for it, from the SQL editor:
+
+```sql
+-- Bound to one address: useless to anyone else who sees the code.
+select code from public.admin_create_invite('friend@example.com');
+
+-- Or an open code, to hand over in person.
+select code from public.admin_create_invite();
+
+-- Expiring in a week.
+select code from public.admin_create_invite('friend@example.com', now() + interval '7 days');
+```
+
+Codes are single-use, 12 characters, and case/space/dash insensitive when
+redeemed. Send the member the code and the site URL; they pick **Create your
+account** on the login screen.
+
+`admin_create_invite` refuses to invite an address that is already a member, so
+a forgotten password does not turn into a second account. Send them to **Forgot
+password?** instead.
+
+To see what is outstanding:
+
+```sql
+select code, email, created_at, expires_at, claimed_by, claimed_at
+  from public.invites order by created_at desc;
+```
+
+### The first admin
+
+Nobody can create the first profile through the app, because redeeming needs an
+invite and minting one needs an admin. Bootstrap it once from the SQL editor,
+after creating the auth user in Authentication → Users:
+
+```sql
+insert into public.profiles (id, email, name, role)
+select id, email, 'Your Name', 'admin' from auth.users where email = 'you@example.com';
+```
+
+---
+
 ## Running a season
 
 ### Before week 1

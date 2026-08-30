@@ -29,6 +29,23 @@ export type Profile = {
   updated_at: string;
 };
 
+/**
+ * An invite. Single-use, and the only route to a profile — see 0003_invites.sql.
+ *
+ * `code` is never readable by a member: the RLS policy shows rows to admins
+ * only, so a member cannot read somebody else’s unclaimed code.
+ */
+export type InviteRow = {
+  code: string;
+  /** When set, only this address may redeem it. Lower case. */
+  email: string | null;
+  created_by: string | null;
+  created_at: string;
+  expires_at: string | null;
+  claimed_by: string | null;
+  claimed_at: string | null;
+};
+
 export type WeekRow = {
   id: string;
   season: number;

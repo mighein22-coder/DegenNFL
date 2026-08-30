@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { GameRow, PickRow, Profile, WeekRow } from './supabase';
+import type { GameRow, InviteRow, PickRow, Profile, WeekRow } from './supabase';
 import { buildWeekId, getCurrentWeekNumber } from './timezone';
 import { SEASON } from '../constants';
 import type { Game, Pick, Week } from '../types';
@@ -62,6 +62,68 @@ function toPick(row: PickRow): Pick {
     pointsEarned: row.points_earned,
     result: row.result
   };
+}
+
+// ---------------------------------------------------------------------------
+// Invites
+//
+//    A profile IS membership, and after 0003 the only way to get one is to
+//    redeem an invite. Nothing here can create a profile directly — the grant
+//    and the policy that used to allow it are both gone.
+// ---------------------------------------------------------------------------
+
+/**
+ * Turn an invite code into this user’s profile.
+ *
+ * Called for a signed-in user who has none yet, which is a normal state: if
+ * the Supabase project requires email confirmation, signup cannot redeem
+ * immediately, because there is no session to attach a profile to until the
+ * address is confirmed. It is also how a mistyped code is recovered from,
+ * rather than stranding the account.
+ *
+ * The code is normalised server-side, so case, spaces and dashes do not
+ * matter. The email is read from `auth.users` rather than taken from here —
+ * an email-bound invite is only worth something if the person redeeming it
+ * cannot assert their own address.
+ */
+export async function redeemInvite(code: string, name: string): Promise<Profile> {
+  const { data, error } = await supabase.rpc('redeem_invite', {
+    p_code: code,
+    p_name: name
+  });
+
+  if (error) throw error;
+  return data as Profile;
+}
+
+/**
+ * Mint a single-use invite code. Admin-only, enforced in the database.
+ *
+ * Pass an email to bind the code to one address, which makes it useless to
+ * anyone else who sees it. Leave it out for a code you hand over in person.
+ */
+export async function createInvite(
+  email?: string,
+  expiresAt?: string
+): Promise<InviteRow> {
+  const { data, error } = await supabase.rpc('admin_create_invite', {
+    p_email: email ?? null,
+    p_expires_at: expiresAt ?? null
+  });
+
+  if (error) throw error;
+  return data as InviteRow;
+}
+
+/** Every invite, outstanding and spent. Returns nothing for a non-admin. */
+export async function listInvites(): Promise<InviteRow[]> {
+  const { data, error } = await supabase
+    .from('invites')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as InviteRow[];
 }
 
 // ---------------------------------------------------------------------------

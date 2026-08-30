@@ -54,7 +54,10 @@ $$;
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'mallory@example.com'),
   ('22222222-2222-2222-2222-222222222222', 'honest@example.com'),
-  ('33333333-3333-3333-3333-333333333333', 'boss@example.com');
+  ('33333333-3333-3333-3333-333333333333', 'boss@example.com'),
+  ('44444444-4444-4444-4444-444444444444', 'stranger@example.com'),
+  ('55555555-5555-5555-5555-555555555555', 'invited@example.com'),
+  ('66666666-6666-6666-6666-666666666666', 'latecomer@example.com');
 
 insert into public.profiles (id, email, name, role) values
   ('11111111-1111-1111-1111-111111111111', 'mallory@example.com', 'Mallory', 'member'),
@@ -467,6 +470,140 @@ select pg_temp.must_fail(
   'admin_set_spread refuses a quarter point',
   $$select 1 from public.admin_set_spread(
       'aaaaaaaa-0000-0000-0000-000000000006', -3.25)$$);
+
+\echo ''
+\echo '--- invites: a profile is the membership, so it must not be self-made ---'
+
+-- Mallory is a member. She must not be able to mint herself an invite, nor
+-- read anyone else's.
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+select pg_temp.must_fail(
+  'a member cannot create an invite',
+  $$select 1 from public.admin_create_invite('friend@example.com')$$);
+
+select pg_temp.assert(
+  'a member cannot see any invite',
+  (select count(*) = 0 from public.invites));
+
+-- THE ONE THAT MATTERS. Before 0003 this insert succeeded, and a profile row
+-- IS membership -- so anyone who could reach the public anon key could sign
+-- up and join a pool played for money.
+set local request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+
+select pg_temp.must_fail(
+  'a signed-up stranger cannot insert their own profile',
+  $$insert into public.profiles (id, email, name)
+    values ('44444444-4444-4444-4444-444444444444', 'stranger@example.com', 'Stranger')$$);
+
+select pg_temp.must_fail(
+  'a stranger cannot redeem a code that does not exist',
+  $$select 1 from public.redeem_invite('NOSUCHCODE12', 'Stranger')$$);
+
+select pg_temp.assert(
+  'and so the stranger is still not a member',
+  (select count(*) = 0 from public.profiles
+    where id = '44444444-4444-4444-4444-444444444444'));
+
+\echo ''
+\echo '--- invites: the admin path, and redeeming one ---'
+
+set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+create temp table pg_temp_open as
+  select (public.admin_create_invite()).code as open_code;
+
+select pg_temp.assert(
+  'an admin can mint an open invite',
+  (select open_code is not null from pg_temp_open));
+
+select pg_temp.must_fail(
+  'an admin cannot invite somebody who is already a member',
+  $$select 1 from public.admin_create_invite('mallory@example.com')$$);
+
+select pg_temp.must_fail(
+  'an admin cannot mint an invite that has already expired',
+  $$select 1 from public.admin_create_invite(null, now() - interval '1 day')$$);
+
+-- Bind one to an address, and stash its code where the tests below can find
+-- it. (A temp table, because a psql variable cannot cross a function call.)
+create temp table pg_temp_codes as
+  select (public.admin_create_invite('invited@example.com')).code as bound_code;
+
+select pg_temp.assert(
+  'an admin can see outstanding invites',
+  (select count(*) >= 2 from public.invites));
+
+-- The wrong person must not be able to spend an email-bound code, even
+-- holding it. This is the whole point of binding.
+set local request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+
+select pg_temp.must_fail(
+  'a bound invite cannot be redeemed by a different address',
+  format($$select 1 from public.redeem_invite(%L, 'Stranger')$$,
+         (select bound_code from pg_temp_codes)));
+
+-- The right person can.
+set local request.jwt.claim.sub = '55555555-5555-5555-5555-555555555555';
+
+select pg_temp.must_fail(
+  'redeeming without a name is refused',
+  format($$select 1 from public.redeem_invite(%L, '   ')$$,
+         (select bound_code from pg_temp_codes)));
+
+-- Sloppy typing must still work: lower case, spaces and dashes all survive.
+select pg_temp.must_pass(
+  'the invited address can redeem it, typed sloppily',
+  format($$select 1 from public.redeem_invite(%L, 'Invited')$$,
+         lower(substr((select bound_code from pg_temp_codes), 1, 4)) || ' - ' ||
+         lower(substr((select bound_code from pg_temp_codes), 5))));
+
+select pg_temp.assert(
+  'redeeming created a member, not an admin',
+  (select role = 'member' and email = 'invited@example.com' from public.profiles
+    where id = '55555555-5555-5555-5555-555555555555'));
+
+-- A member cannot read `invites` at all -- that is the point of the policy --
+-- so the claim has to be confirmed as the admin.
+set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+select pg_temp.assert(
+  'the invite is now claimed',
+  (select claimed_by = '55555555-5555-5555-5555-555555555555'
+     and claimed_at is not null
+     from public.invites
+    where code = (select bound_code from pg_temp_codes)));
+
+-- Already a member, so this is refused before the code is even looked at.
+-- Passing a literal keeps that unambiguous: redeem_invite checks membership
+-- first, so a valid code here would be refused for the same reason.
+set local request.jwt.claim.sub = '55555555-5555-5555-5555-555555555555';
+
+select pg_temp.must_fail(
+  'an existing member cannot redeem a second invite',
+  $$select 1 from public.redeem_invite('ANYCODE12345', 'Greedy')$$);
+
+-- Now the single-use rule, tested by somebody who is neither a member nor
+-- excluded by an email binding: the open code, and a brand new account. The
+-- ONLY thing that can refuse this is the code already being spent.
+set local request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+
+select pg_temp.must_pass(
+  'an open invite can be redeemed by anyone holding it',
+  format($$select 1 from public.redeem_invite(%L, 'Stranger')$$,
+         (select open_code from pg_temp_open)));
+
+set local request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+
+select pg_temp.must_fail(
+  'the same code cannot be redeemed twice',
+  format($$select 1 from public.redeem_invite(%L, 'Latecomer')$$,
+         (select open_code from pg_temp_open)));
+
+select pg_temp.assert(
+  'the second claimant did not get a profile',
+  (select count(*) = 0 from public.profiles
+    where id = '66666666-6666-6666-6666-666666666666'));
 
 \echo ''
 rollback;

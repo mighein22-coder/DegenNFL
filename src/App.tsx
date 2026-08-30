@@ -9,6 +9,7 @@ import { PUBLIC_ROUTES } from './routes';
 import { LoginView } from './components/views/LoginView';
 import { AuthCallbackView } from './components/views/AuthCallbackView';
 import { PicksPage } from './components/views/PicksPage';
+import { RedeemInviteView } from './components/views/RedeemInviteView';
 import { DashboardView } from './components/views/DashboardView';
 import { StandingsView } from './components/views/StandingsView';
 import { ResultsView } from './components/views/ResultsView';
@@ -26,7 +27,7 @@ import { AdminView } from './components/views/AdminView';
  * was made one.
  */
 const App: React.FC = () => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, signUp, redeem } = useAuth();
   const navigate = useNavigate();
 
   // Captured at load, before supabase-js erases the URL fragment.
@@ -71,9 +72,26 @@ const App: React.FC = () => {
   if (!user) {
     return (
       <Routes>
-        <Route path={PUBLIC_ROUTES.login} element={<LoginView onLogin={signIn} />} />
+        <Route
+          path={PUBLIC_ROUTES.login}
+          element={<LoginView onLogin={signIn} onSignUp={signUp} />}
+        />
         <Route path="*" element={<Navigate to={PUBLIC_ROUTES.login} replace />} />
       </Routes>
+    );
+  }
+
+  // Signed in, but not a member yet: they confirmed an email without redeeming
+  // an invite, or mistyped the code. A profile IS membership since 0003, so
+  // there is nothing of the pool to show them until they have one. Without
+  // this the shell rendered with a null profile and quietly half-worked.
+  if (!profile) {
+    return (
+      <RedeemInviteView
+        email={user.email ?? ''}
+        onRedeem={redeem}
+        onSignOut={signOut}
+      />
     );
   }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase, type Profile } from '../lib/supabase';
+import { redeemInvite } from '../lib/supabaseService';
 import type { User } from '@supabase/supabase-js';
 
 /**
@@ -44,10 +45,14 @@ export function useAuth() {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
+      // A signed-in user with no profile row is a NORMAL state since 0003:
+      // they have confirmed an email but not yet redeemed an invite. maybeSingle
+      // returns null rather than erroring, and the app shows them the redeem
+      // screen. Treating it as an error here is what would strand them.
       if (error) throw error;
-      setProfile(data);
+      setProfile((data as Profile | null) ?? null);
     } catch (error) {
       console.error('Error loading profile:', error);
       setProfile(null);
@@ -89,11 +94,31 @@ export function useAuth() {
   };
 
   /**
-   * Sign up new user (admin only in production)
+   * Sign up, gated by an invite code.
+   *
+   * Two steps, and they cannot be collapsed into one:
+   *
+   *   1. `auth.signUp` creates the auth user. This is Supabase's own endpoint
+   *      and we cannot gate it — anyone with the public anon key can call it.
+   *   2. `redeem_invite` creates the PROFILE, and a profile is what membership
+   *      actually is. That step needs a valid code.
+   *
+   * An auth user with no profile can see nothing and pick nothing: picks are
+   * foreign-keyed to profiles, so the database refuses. That is the gate.
+   *
+   * If the project requires email confirmation, step 1 returns no session, so
+   * step 2 cannot run yet — there is no auth.uid() to attach the profile to.
+   * `needsConfirmation` says so, and the redeem screen picks it up after they
+   * confirm and sign in. This used to insert the profile row directly, which
+   * is precisely the hole 0003 closes.
    */
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    name: string,
+    inviteCode: string
+  ): Promise<{ needsConfirmation: boolean }> => {
     try {
-      // Create auth user
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password
@@ -102,23 +127,25 @@ export function useAuth() {
       if (error) throw error;
       if (!data.user) throw new Error('User creation failed');
 
-      // Create profile. `role` is deliberately not sent: clients have no INSERT
-      // privilege on that column (see migration 0002), so it falls through to
-      // its DEFAULT of 'member'. Sending it would fail the insert outright.
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: data.user.id,
-          email: email.trim().toLowerCase(),
-          name: name.trim()
-        });
+      // No session means the address needs confirming first. Redemption waits.
+      if (!data.session) return { needsConfirmation: true };
 
-      if (profileError) throw profileError;
-
-      return data;
+      await redeemInvite(inviteCode, name);
+      await loadProfile(data.user.id);
+      return { needsConfirmation: false };
     } catch (error: any) {
       throw new Error(error.message || 'Signup failed');
     }
+  };
+
+  /**
+   * Redeem an invite for a user who is already signed in without a profile —
+   * after confirming an email, or after mistyping the code at signup.
+   */
+  const redeem = async (inviteCode: string, name: string) => {
+    if (!user) throw new Error('Not signed in');
+    await redeemInvite(inviteCode, name);
+    await loadProfile(user.id);
   };
 
   /**
@@ -137,6 +164,7 @@ export function useAuth() {
     signIn,
     signOut,
     signUp,
+    redeem,
     refreshProfile,
     isAuthenticated: !!user,
     isAdmin: profile?.role === 'admin'

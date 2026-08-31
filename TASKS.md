@@ -68,10 +68,14 @@ Read `PLANNING.md` for why things are shaped the way they are.
 - [ ] Build the real views — each stub under `src/components/views/` lists what
       it needs. Rough order of value: Dashboard, Standings, League Matrix,
       My History, Team Affinity, Settings, Admin.
-- [ ] Admin panel: a button calling `activateWeek(weekNumber)` (the manual
-      version of the Tuesday cron), and an input calling `setSpread(gameId,
-      rawSpread)` for any game that opened without a line. The service
-      functions exist; this is the UI for them.
+- [ ] Admin panel: an input calling `setSpread(gameId, rawSpread)` for any game
+      that opened without a line. The service function exists; this is the UI
+      for it.
+      - [x] The `activateWeek(weekNumber)` button — the manual version of the
+            Tuesday cron — is built. It warns when the chosen week's own Tuesday
+            is still in the future, because activating early freezes that week's
+            lines permanently at today's market and the cron will not re-price
+            them. Teardown SQL is in `docs/OPERATIONS.md`.
 - [ ] Verify `weekly-rollover` against the live project once the schema is
       applied — activate a week, confirm 16 games and 16 hooked spreads, then
       re-run and confirm it changes nothing.

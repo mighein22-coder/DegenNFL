@@ -283,6 +283,38 @@ An admin can do the same thing by hand from the Admin panel, which calls
 `activateWeek(weekNumber)` in `src/lib/supabaseService.ts` and reaches the same
 code through `admin-activate-week`. Safe to run twice.
 
+### Opening a week early, to see the sheet before its Tuesday
+
+The Picks screen already asks for the right week — `getCurrentWeekNumber()`
+clamps to 1 before the season starts, so out of season `/picks` is looking at
+week 1 and showing the "not open yet" state only because no games are seeded.
+There is nothing to change on that screen. Activating the week is the whole
+fix, and the Admin panel button does it.
+
+**But activation is the only moment the app ever writes a spread, and it never
+rewrites one.** Opening week 1 in August does not preview the sheet — it
+*freezes* week 1's numbers at August's market, permanently. The Tuesday job
+will then find every line already set and leave them alone, and the pool plays
+the season against lines that are weeks stale. The Admin panel warns about this
+whenever the week's own Tuesday is still in the future.
+
+So an early activation is only safe if you tear it down afterwards. Picks
+cascade from games, so two statements clear the week completely:
+
+```sql
+-- Deletes the seeded schedule, the frozen lines, and (by cascade) every test
+-- pick made against them. Run BEFORE the real Tuesday capture.
+delete from public.games where week_id = 'week-2026-01';
+delete from public.weeks where id = 'week-2026-01';
+```
+
+The next activation — the cron's, or another press of the button — then reseeds
+from scratch and prices the lines fresh. Verify with:
+
+```sql
+select count(*) from public.games where week_id = 'week-2026-01';  -- expect 0
+```
+
 ### If a line is missing when the week opens
 
 The rollover logs, loudly:

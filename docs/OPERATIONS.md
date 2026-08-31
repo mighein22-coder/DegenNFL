@@ -155,8 +155,15 @@ rather than one per member, and it is what makes signup genuinely self-serve
 instead of making you the bottleneck.
 
 ```sql
-select code, expires_at from public.admin_create_invite();
+insert into public.invites (code) values (public.generate_invite_code())
+returning code, expires_at;
 ```
+
+**Not `admin_create_invite()`.** That function gates on `is_admin()`, which reads
+`auth.uid()` — and the SQL editor is a superuser session with nobody logged in,
+so it refuses with `admin_create_invite: admins only`. The function is for the
+Admin panel, where a real admin session exists. From the SQL editor, insert
+directly; being a superuser session is exactly what lets you.
 
 Codes are 12 characters and case/space/dash insensitive when redeemed, so it
 survives being typed badly. Send it with the site URL; members pick **Create
@@ -167,14 +174,16 @@ trade: anyone holding the code can join, so it has to shut on its own rather
 than depending on you to remember. Set your own window with a second argument:
 
 ```sql
-select code, expires_at from public.admin_create_invite(null, now() + interval '30 days');
+insert into public.invites (code, expires_at)
+values (public.generate_invite_code(), now() + interval '30 days')
+returning code, expires_at;
 ```
 
 And close it early once everybody is in — the expiry is the safety net, this is
 the deliberate act:
 
 ```sql
-select public.admin_revoke_invite('ABCD1234EFGH');
+update public.invites set revoked_at = now() where code = 'ABCD1234EFGH';
 ```
 
 ### Inviting one person later
@@ -184,7 +193,16 @@ nothing when only one address may use it, and an intercepted code is useless to
 anyone else:
 
 ```sql
-select code from public.admin_create_invite('friend@example.com');
+insert into public.invites (code, email)
+values (public.generate_invite_code(), 'friend@example.com')
+returning code, expires_at;
+```
+
+Check first that they are not already a member — `admin_create_invite` does that
+for you, a raw insert does not:
+
+```sql
+select id, email from public.profiles where lower(email) = 'friend@example.com';
 ```
 
 This refuses an address that is already a member, so a forgotten password does

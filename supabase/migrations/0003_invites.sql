@@ -485,11 +485,25 @@ commit;
 -- 4. The permissive policies are gone. Expect ZERO rows. Re-run this one after
 --    ANY migration work: applying 0001 by itself puts them back.
 --
+--    Note what is NOT flagged. `weeks_select_all` and `games_select_all` are
+--    `using (true)` on purpose -- they are the NFL schedule, and there is
+--    nothing in a fixture list worth hiding from a signed-in user. An earlier
+--    draft of this query flagged them, which made it noisy AND weaker: it
+--    keyed on `with_check = 'true'`, so it missed profiles_insert_self, whose
+--    predicate is `auth.uid() = id`. That reads as restrictive and is exactly
+--    the hole -- it lets every signed-in user make themselves a member. So the
+--    rule for profiles is ANY insert policy, not a permissive one.
+--
+--    This matches what supabase/test/run.sh checks after re-applying 0001.
+--    Keep the two in step.
+--
 -- select tablename, policyname, cmd, qual, with_check from pg_policies
 --  where schemaname = 'public'
---    and (with_check = 'true' or qual = 'true')
---    and cmd in ('INSERT', 'SELECT')
---    and tablename in ('profiles', 'weeks', 'games');
+--    and (
+--      (cmd = 'INSERT' and tablename = 'profiles')
+--   or (cmd = 'INSERT' and with_check = 'true' and tablename in ('weeks', 'games'))
+--   or (cmd = 'SELECT' and qual = 'true' and tablename = 'profiles')
+--    );
 --
 -- 5. No code was claimed twice. Expect ZERO rows, always.
 --

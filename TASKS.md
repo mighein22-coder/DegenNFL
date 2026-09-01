@@ -42,6 +42,19 @@ Read `PLANNING.md` for why things are shaped the way they are.
       `VITE_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
       **No `VITE_`-prefixed secrets** — Vite inlines those into the public
       bundle, which is how the NHL app leaked its sync secret.
+- [X] **Why `SUPABASE_SERVICE_ROLE_KEY` is missing on deploy previews.**
+      Resolved 2026-09-01: nothing is misconfigured. Netlify's Sensitive
+      Variable Policy withholds sensitive variables from untrusted deploys on
+      sites connected to public repos, and every Deploy Preview is untrusted.
+      Correct behaviour — the key bypasses all RLS, and anyone can open a PR
+      against a public repo. **Do not "fix" it by loosening the policy.** See
+      *Deploy previews never get the service-role key* in `docs/OPERATIONS.md`.
+- [ ] **Verify activation works on PRODUCTION, before Tuesday 8 Sep.** Untested,
+      and the preview cannot test it — production is a different (trusted)
+      context. `weekly-rollover` runs on the same credential, so if production
+      cannot read it either, the 8 Sep job dies and week 1 never opens with
+      nobody watching. Merging PR #4 deploys the clearer error message, which
+      is what makes this a five-second check rather than another afternoon.
 - [ ] Configure the subdomain.
 - [ ] Allowlist `/auth/callback` in Supabase → Authentication → URL
       Configuration. No app change substitutes for this; password reset
@@ -68,10 +81,14 @@ Read `PLANNING.md` for why things are shaped the way they are.
 - [ ] Build the real views — each stub under `src/components/views/` lists what
       it needs. Rough order of value: Dashboard, Standings, League Matrix,
       My History, Team Affinity, Settings, Admin.
-- [ ] Admin panel: a button calling `activateWeek(weekNumber)` (the manual
-      version of the Tuesday cron), and an input calling `setSpread(gameId,
-      rawSpread)` for any game that opened without a line. The service
-      functions exist; this is the UI for them.
+- [ ] Admin panel: an input calling `setSpread(gameId, rawSpread)` for any game
+      that opened without a line. The service function exists; this is the UI
+      for it.
+      - [x] The `activateWeek(weekNumber)` button — the manual version of the
+            Tuesday cron — is built. It warns when the chosen week's own Tuesday
+            is still in the future, because activating early freezes that week's
+            lines permanently at today's market and the cron will not re-price
+            them. Teardown SQL is in `docs/OPERATIONS.md`.
 - [ ] Verify `weekly-rollover` against the live project once the schema is
       applied — activate a week, confirm 16 games and 16 hooked spreads, then
       re-run and confirm it changes nothing.

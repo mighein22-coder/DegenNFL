@@ -24,6 +24,76 @@ configure. Do not reintroduce one.
 Locally, `src/.env.local` (gitignored) holds the two public values. Copy
 `src/.env.example`.
 
+### "Set" and "the function can see it" are different claims
+
+Every function that holds the service-role key — `sync-week`,
+`admin-activate-week`, `weekly-rollover` — fails closed with a 500 if it cannot
+read `VITE_SUPABASE_URL` (or `SUPABASE_URL`) and `SUPABASE_SERVICE_ROLE_KEY`.
+There are two independent ways to have set a variable and still land there, and
+both present identically as *"the site works in the browser, the functions
+500"*:
+
+| | What it looks like |
+|---|---|
+| **Context** | The variable is set for Production but not for Deploy Previews or branch deploys. The preview builds fine and its functions fail. |
+| **Scope** | The variable is scoped to **Builds** but not **Functions**. Vite inlines it into the client bundle at build time, so signing in and every page render works — while `process.env` is empty in the Lambda at runtime. |
+
+The scope one is the trap, and `VITE_SUPABASE_URL` is its likeliest victim,
+since being a build-time value is its whole job. (Scopes are a Pro/Enterprise
+feature. This site is on the free plan, where every variable applies to all
+scopes and there is no selector — so on this site, scope is never the answer.)
+
+### Deploy previews never get the service-role key, and should not
+
+**This is not a misconfiguration and there is nothing to fix.** Diagnosed
+2026-09-01, after it cost most of an afternoon.
+
+`admin-activate-week` 500s on every deploy preview with
+`SUPABASE_SERVICE_ROLE_KEY is not visible to this function`, while
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` reach the same function on the
+same deploy. The cause is Netlify's **Sensitive Variable Policy**
+(*Project configuration → Environment variables → Site policies*), which exists
+for sites connected to **public repositories** — which this one is. It withholds
+variables Netlify considers sensitive from *untrusted* deploys, and every Deploy
+Preview is untrusted.
+
+That is the correct behaviour and worth keeping. Anyone can open a pull request
+against a public repo, and a preview builds and runs their code. The
+service-role key bypasses every RLS policy in the schema — the entire security
+model of `0001_init.sql` — so a preview holding it would let a stranger's PR
+read and rewrite the whole pool.
+
+So: **do not set the policy to "Deploy without restrictions"** to make a preview
+work. That trades the schema's security model for a convenience.
+
+To exercise activation, in preference order:
+
+1. **Test on production.** Production is a trusted context and gets the
+   variable. This is the normal path.
+2. **Approve the specific deploy.** If the policy is "Require approval", a site
+   member can approve a deploy and it then builds with sensitive variables.
+   Reasonable for your own branch; never approve a fork's PR this way.
+3. **Run it locally** with `netlify dev` and a gitignored local env file, which
+   is outside Netlify's policy entirely. Note this still writes to the *real*
+   Supabase project — "local" describes where the code runs, not which database
+   it touches.
+
+`_shared/supabaseEnv.ts` returns a small `diagnostic` alongside the 500 —
+counts and one boolean, never a name or a value — which is what identified this.
+`supabaseNameCount: 2` with `nearMissPresent: false` is the signature of exactly
+this policy: the two public variables arrived, the sensitive one was stripped,
+and nothing was misspelled.
+
+`_shared/supabaseEnv.ts` is the single check all three share. It names the
+variables actually missing rather than making you guess between them, so the
+500 body tells you which dashboard field to go fix. It returns names only,
+never values.
+
+Note the deadline this sits in front of: `weekly-rollover` reads the same two
+variables. If they are not visible to functions **in production**, the Tuesday
+18:00 ET job dies before it does anything and the week silently never opens.
+Confirm the production context before the season starts, not on the Tuesday.
+
 ---
 
 ## Installing and checking
@@ -282,6 +352,38 @@ line already frozen is never re-priced.
 An admin can do the same thing by hand from the Admin panel, which calls
 `activateWeek(weekNumber)` in `src/lib/supabaseService.ts` and reaches the same
 code through `admin-activate-week`. Safe to run twice.
+
+### Opening a week early, to see the sheet before its Tuesday
+
+The Picks screen already asks for the right week — `getCurrentWeekNumber()`
+clamps to 1 before the season starts, so out of season `/picks` is looking at
+week 1 and showing the "not open yet" state only because no games are seeded.
+There is nothing to change on that screen. Activating the week is the whole
+fix, and the Admin panel button does it.
+
+**But activation is the only moment the app ever writes a spread, and it never
+rewrites one.** Opening week 1 in August does not preview the sheet — it
+*freezes* week 1's numbers at August's market, permanently. The Tuesday job
+will then find every line already set and leave them alone, and the pool plays
+the season against lines that are weeks stale. The Admin panel warns about this
+whenever the week's own Tuesday is still in the future.
+
+So an early activation is only safe if you tear it down afterwards. Picks
+cascade from games, so two statements clear the week completely:
+
+```sql
+-- Deletes the seeded schedule, the frozen lines, and (by cascade) every test
+-- pick made against them. Run BEFORE the real Tuesday capture.
+delete from public.games where week_id = 'week-2026-01';
+delete from public.weeks where id = 'week-2026-01';
+```
+
+The next activation — the cron's, or another press of the button — then reseeds
+from scratch and prices the lines fresh. Verify with:
+
+```sql
+select count(*) from public.games where week_id = 'week-2026-01';  -- expect 0
+```
 
 ### If a line is missing when the week opens
 

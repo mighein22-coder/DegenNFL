@@ -8,6 +8,7 @@ import {
   formatETTime
 } from './_shared/etTime';
 import { activateWeek, syncAndGradeWeek } from './_shared/weekLifecycle';
+import { readSupabaseEnv } from './_shared/supabaseEnv';
 import { SEASON } from '../../src/constants';
 
 /**
@@ -44,21 +45,19 @@ import { SEASON } from '../../src/constants';
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 const rollover: Handler = async () => {
-  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('[ROLLOVER] Missing env vars', {
-      hasUrl: !!supabaseUrl,
-      hasKey: !!serviceRoleKey
-    });
-    return { statusCode: 500, body: JSON.stringify({ error: 'Server misconfiguration' }) };
+  // Nobody is watching a cron run, so this message exists to be found in the
+  // function log months later. A rollover that dies here is the season not
+  // opening, which is why it logs the specific variable rather than a shrug.
+  const env = readSupabaseEnv();
+  if (!env.ok) {
+    console.error('[ROLLOVER] Missing env vars', env.missing, env.message);
+    return { statusCode: 500, body: JSON.stringify({ error: env.message }) };
   }
 
   // No bearer token here: a scheduled invocation has no user. The service-role
   // key is the whole authority, which is why this file must never grow an HTTP
   // path that a browser could reach.
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
+  const admin = createClient(env.env.url, env.env.serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false }
   });
 

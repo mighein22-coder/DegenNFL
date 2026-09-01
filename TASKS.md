@@ -56,6 +56,13 @@ Read `PLANNING.md` for why things are shaped the way they are.
         key. Until it is set that job dies before doing anything, week 1 never
         opens, and nothing surfaces it — a failing cron is silent. Activation,
         score sync and grading are blocked by the same thing.
+- [ ] Tighten `@supabase/supabase-js` in `netlify/functions/package.json`. It
+      declares `^2.0.0` while `src` declares `^2.89.0`; the range resolved to
+      2.112.4, which requires Node 22 for native WebSocket and broke every
+      service-role function on Node 20 with a 502. The committed lockfile plus
+      `npm ci` is what actually pins it, so this is about the declared range no
+      longer describing what the code needs — `^2.0.0` claims support for
+      versions that cannot work.
 - [ ] Configure the subdomain.
 - [ ] Allowlist `/auth/callback` in Supabase → Authentication → URL
       Configuration. No app change substitutes for this; password reset

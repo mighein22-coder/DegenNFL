@@ -43,56 +43,52 @@ since being a build-time value is its whole job. (Scopes are a Pro/Enterprise
 feature. This site is on the free plan, where every variable applies to all
 scopes and there is no selector — so on this site, scope is never the answer.)
 
-### Deploy previews never get the service-role key, and should not
+### `SUPABASE_SERVICE_ROLE_KEY` reaches no function, in any context
 
-**This is not a misconfiguration and there is nothing to fix.** Diagnosed
-2026-09-01, after it cost most of an afternoon.
+**OPEN as of 2026-09-01, and it blocks the season.** Every service-role function
+500s — on deploy previews *and on production* — with
+`SUPABASE_SERVICE_ROLE_KEY is not visible to this function`. Both return the
+identical diagnostic:
 
-`admin-activate-week` 500s on every deploy preview with
-`SUPABASE_SERVICE_ROLE_KEY is not visible to this function`, while
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` reach the same function on the
-same deploy. The cause is Netlify's **Sensitive Variable Policy**
-(*Project configuration → Environment variables → Site policies*), which exists
-for sites connected to **public repositories** — which this one is. It withholds
-variables Netlify considers sensitive from *untrusted* deploys, and every Deploy
-Preview is untrusted.
+```json
+{"supabaseNameCount": 2, "totalCount": 37, "nearMissPresent": false}
+```
 
-That is the correct behaviour and worth keeping. Anyone can open a pull request
-against a public repo, and a preview builds and runs their code. The
-service-role key bypasses every RLS policy in the schema — the entire security
-model of `0001_init.sql` — so a preview holding it would let a stranger's PR
-read and rewrite the whole pool.
+Read that as: 37 variables reach the function, so the environment is delivered
+normally; two names contain "supabase", being `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY`; and nothing is present that merely *misspells* the
+service-role key. It is simply not there.
 
-So: **do not set the policy to "Deploy without restrictions"** to make a preview
-work. That trades the schema's security model for a convenience.
+What that rules out, each by evidence rather than assumption:
 
-To exercise activation, in preference order:
+| Ruled out | Why |
+|---|---|
+| Scope (Builds vs Functions) | Scopes are a Pro feature; this site is `nf_team_dev` (free), where all variables apply to all scopes and no selector exists. |
+| Deploy context | Production shows the identical diagnostic, and production is the primary context. |
+| A typo in the name | `nearMissPresent: false`, and the count of 2 is fully accounted for by the two `VITE_` variables. |
+| A stale deploy | Production served the older error message until #4 merged and the newer one after, so it is running current code. |
+| Netlify's Sensitive Variable Policy | It withholds sensitive variables from *untrusted* deploys, which would explain previews — but it does not apply to production, and production fails identically. |
 
-1. **Test on production.** Production is a trusted context and gets the
-   variable. This is the normal path.
-2. **Approve the specific deploy.** If the policy is "Require approval", a site
-   member can approve a deploy and it then builds with sensitive variables.
-   Reasonable for your own branch; never approve a fork's PR this way.
-3. **Run it locally** with `netlify dev` and a gitignored local env file, which
-   is outside Netlify's policy entirely. Note this still writes to the *real*
-   Supabase project — "local" describes where the code runs, not which database
-   it touches.
+That last row was briefly recorded here as the answer. It was wrong, and wrong
+in an instructive way: it explained the preview perfectly and had never been
+tested against production, which is the case that disproves it. Do not re-adopt
+it without re-checking production.
 
-`_shared/supabaseEnv.ts` returns a small `diagnostic` alongside the 500 —
-counts and one boolean, never a name or a value — which is what identified this.
-`supabaseNameCount: 2` with `nearMissPresent: false` is the signature of exactly
-this policy: the two public variables arrived, the sensitive one was stripped,
-and nothing was misspelled.
+What remains is that the variable is not on the `degennfl` site at all — never
+saved, saved against a different site or team, or held as a shared/team variable
+not linked to this project. **Verify by listing the variables and reading the
+name, not by opening the one you expect to find**: a variable that exists but is
+not the one being read looks identical from its own edit screen.
 
-`_shared/supabaseEnv.ts` is the single check all three share. It names the
-variables actually missing rather than making you guess between them, so the
-500 body tells you which dashboard field to go fix. It returns names only,
-never values.
+`_shared/supabaseEnv.ts` is the single check all three functions share. It names
+the missing variable rather than making you guess between two, and returns the
+`diagnostic` above — counts and one boolean, never a name and never a value, so
+it is safe on an endpoint that must answer before it can authenticate anyone.
 
-Note the deadline this sits in front of: `weekly-rollover` reads the same two
-variables. If they are not visible to functions **in production**, the Tuesday
-18:00 ET job dies before it does anything and the week silently never opens.
-Confirm the production context before the season starts, not on the Tuesday.
+Until this is set, everything holding the service-role key is dead: activation,
+score sync, grading, and `weekly-rollover`. The rollover is the one with a date
+on it — **Tuesday 8 Sep, 18:00 ET**. It fails silently, because nobody watches
+a cron, and the visible symptom is simply that week 1 never opens.
 
 ---
 

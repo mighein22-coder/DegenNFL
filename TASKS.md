@@ -42,19 +42,20 @@ Read `PLANNING.md` for why things are shaped the way they are.
       `VITE_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
       **No `VITE_`-prefixed secrets** — Vite inlines those into the public
       bundle, which is how the NHL app leaked its sync secret.
-- [X] **Why `SUPABASE_SERVICE_ROLE_KEY` is missing on deploy previews.**
-      Resolved 2026-09-01: nothing is misconfigured. Netlify's Sensitive
-      Variable Policy withholds sensitive variables from untrusted deploys on
-      sites connected to public repos, and every Deploy Preview is untrusted.
-      Correct behaviour — the key bypasses all RLS, and anyone can open a PR
-      against a public repo. **Do not "fix" it by loosening the policy.** See
-      *Deploy previews never get the service-role key* in `docs/OPERATIONS.md`.
-- [ ] **Verify activation works on PRODUCTION, before Tuesday 8 Sep.** Untested,
-      and the preview cannot test it — production is a different (trusted)
-      context. `weekly-rollover` runs on the same credential, so if production
-      cannot read it either, the 8 Sep job dies and week 1 never opens with
-      nobody watching. Merging PR #4 deploys the clearer error message, which
-      is what makes this a five-second check rather than another afternoon.
+- [ ] **`SUPABASE_SERVICE_ROLE_KEY` reaches NO function, production included.
+      THIS BLOCKS THE SEASON.** Confirmed 2026-09-01 after merging #4:
+      production and deploy previews return the same diagnostic — 37 variables
+      delivered, both `VITE_` Supabase ones present, the service-role key absent,
+      no misspelled variant. Scope, deploy context, typo, stale deploy and
+      Netlify's sensitive-variable policy are each ruled out by evidence; see
+      `docs/OPERATIONS.md`. What is left is that it is not set on the `degennfl`
+      site — never saved, saved on another site or team, or a shared variable
+      not linked here. List the variables and read the name; do not confirm it
+      by opening the variable you expect to find.
+      - **Deadline Tuesday 8 Sep, 18:00 ET.** `weekly-rollover` runs on this
+        key. Until it is set that job dies before doing anything, week 1 never
+        opens, and nothing surfaces it — a failing cron is silent. Activation,
+        score sync and grading are blocked by the same thing.
 - [ ] Configure the subdomain.
 - [ ] Allowlist `/auth/callback` in Supabase → Authentication → URL
       Configuration. No app change substitutes for this; password reset

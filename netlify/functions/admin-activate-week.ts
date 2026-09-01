@@ -1,6 +1,7 @@
 import type { Handler, HandlerEvent } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { activateWeek } from './_shared/weekLifecycle';
+import { readSupabaseEnv } from './_shared/supabaseEnv';
 import { SEASON } from '../../src/constants';
 
 /**
@@ -30,23 +31,16 @@ const handler: Handler = async (event: HandlerEvent) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('[ADMIN ACTIVATE] Missing env vars', {
-      hasUrl: !!supabaseUrl,
-      hasKey: !!serviceRoleKey
-    });
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        error: 'Server misconfiguration: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
-      })
-    };
+  // Necessarily before the bearer-token check below: verifying the caller's
+  // token needs the admin client, which needs these. An unauthenticated caller
+  // can therefore learn which variable is unset — a name, never a value.
+  const env = readSupabaseEnv();
+  if (!env.ok) {
+    console.error('[ADMIN ACTIVATE] Missing env vars', env.missing);
+    return { statusCode: 500, body: JSON.stringify({ error: env.message }) };
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
+  const admin = createClient(env.env.url, env.env.serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false }
   });
 

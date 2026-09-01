@@ -34,9 +34,39 @@ export interface SupabaseEnv {
   serviceRoleKey: string;
 }
 
+/**
+ * What the runtime environment looks like, described without naming anything.
+ *
+ * Deploy-preview function logs do not appear on the project's Functions log
+ * page — that page shows production — so a log-only diagnostic is unreadable
+ * for exactly the deploy being debugged. This travels in the response instead,
+ * which means it must be safe for an unauthenticated caller to see.
+ *
+ * So it discloses no names and no values, only three counts and a flag. That is
+ * enough to separate the three causes that look identical from outside:
+ *
+ *   supabaseNameCount 0  — nothing is reaching this function at all
+ *   nearMissPresent      — a variable differing only in case, whitespace or
+ *                          punctuation exists, i.e. the name is mistyped
+ *   neither              — the variable is genuinely absent from this context
+ */
+export interface EnvDiagnostic {
+  /** How many variable names contain "supabase", case-insensitively. */
+  supabaseNameCount: number;
+  /** Total variables visible. A plausible number rules out "empty process.env". */
+  totalCount: number;
+  /** A name that normalises to SUPABASE_SERVICE_ROLE_KEY but is not equal to it. */
+  nearMissPresent: boolean;
+}
+
 export type SupabaseEnvResult =
   | { ok: true; env: SupabaseEnv }
-  | { ok: false; missing: string[]; message: string };
+  | { ok: false; missing: string[]; message: string; diagnostic: EnvDiagnostic };
+
+/** Strips case, whitespace and separators, so `supabase service-role key ` collides. */
+function normalise(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
 
 /**
  * Read and validate the service-role credentials.
@@ -66,18 +96,30 @@ export function readSupabaseEnv(): SupabaseEnvResult {
     // configuration when the deploy is built, so editing a variable does not
     // change a deploy that already exists — it takes a redeploy. An empty list
     // here alongside a working client bundle is that second case.
-    const visible = Object.keys(process.env)
-      .filter(name => /SUPABASE/i.test(name))
-      .sort();
+    const names = Object.keys(process.env);
+    const visible = names.filter(name => /SUPABASE/i.test(name)).sort();
+
+    // The log still gets the full names — it is private to the project owner,
+    // and on a production deploy it is the fastest read of all.
     console.error(
       `[ENV] SUPABASE-ish names visible to this function: ${
         visible.length > 0 ? visible.join(', ') : '(none)'
       }`
     );
 
+    const wanted = normalise('SUPABASE_SERVICE_ROLE_KEY');
+    const diagnostic: EnvDiagnostic = {
+      supabaseNameCount: visible.length,
+      totalCount: names.length,
+      nearMissPresent: names.some(
+        name => name !== 'SUPABASE_SERVICE_ROLE_KEY' && normalise(name) === wanted
+      )
+    };
+
     return {
       ok: false,
       missing,
+      diagnostic,
       message:
         `Server misconfiguration: ${missing.join(' and ')} ` +
         `${missing.length === 1 ? 'is' : 'are'} not visible to this function. ` +

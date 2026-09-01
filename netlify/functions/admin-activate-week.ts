@@ -37,7 +37,13 @@ const handler: Handler = async (event: HandlerEvent) => {
   const env = readSupabaseEnv();
   if (!env.ok) {
     console.error('[ADMIN ACTIVATE] Missing env vars', env.missing);
-    return { statusCode: 500, body: JSON.stringify({ error: env.message }) };
+    // `diagnostic` carries counts and one flag — never a name, never a value.
+    // See EnvDiagnostic: deploy-preview logs are not readable from the project
+    // Functions page, so the only way to see this for a preview is over HTTP.
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: env.message, diagnostic: env.diagnostic })
+    };
   }
 
   const admin = createClient(env.env.url, env.env.serviceRoleKey, {

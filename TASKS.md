@@ -42,6 +42,19 @@ Read `PLANNING.md` for why things are shaped the way they are.
       `VITE_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
       **No `VITE_`-prefixed secrets** — Vite inlines those into the public
       bundle, which is how the NHL app leaked its sync secret.
+- [ ] **Make `SUPABASE_SERVICE_ROLE_KEY` visible to Netlify FUNCTIONS.**
+      Confirmed 2026-09-01 against the PR #4 deploy preview: activation 500s
+      before doing any work, and the env check names this one variable.
+      `VITE_SUPABASE_URL` resolves fine in the same function on the same
+      deploy — so the deploy-preview context does reach functions, and it is
+      the service-role key alone that is either scoped to Builds rather than
+      Functions, or set for Production only. Check those two fields on that one
+      variable. See *"Set" and "the function can see it" are different claims*
+      in `docs/OPERATIONS.md`.
+      - **Production is the one with a deadline.** `weekly-rollover` reads the
+        same variable, so if it is not visible to functions there, the Tuesday
+        8 Sep job dies and week 1 never opens. Verify before then — the preview
+        being fixed does not prove production is.
 - [ ] Configure the subdomain.
 - [ ] Allowlist `/auth/callback` in Supabase → Authentication → URL
       Configuration. No app change substitutes for this; password reset

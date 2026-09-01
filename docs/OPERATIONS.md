@@ -24,6 +24,33 @@ configure. Do not reintroduce one.
 Locally, `src/.env.local` (gitignored) holds the two public values. Copy
 `src/.env.example`.
 
+### "Set" and "the function can see it" are different claims
+
+Every function that holds the service-role key — `sync-week`,
+`admin-activate-week`, `weekly-rollover` — fails closed with a 500 if it cannot
+read `VITE_SUPABASE_URL` (or `SUPABASE_URL`) and `SUPABASE_SERVICE_ROLE_KEY`.
+There are two independent ways to have set a variable and still land there, and
+both present identically as *"the site works in the browser, the functions
+500"*:
+
+| | What it looks like |
+|---|---|
+| **Context** | The variable is set for Production but not for Deploy Previews or branch deploys. The preview builds fine and its functions fail. |
+| **Scope** | The variable is scoped to **Builds** but not **Functions**. Vite inlines it into the client bundle at build time, so signing in and every page render works — while `process.env` is empty in the Lambda at runtime. |
+
+The scope one is the trap, and `VITE_SUPABASE_URL` is its likeliest victim,
+since being a build-time value is its whole job.
+
+`_shared/supabaseEnv.ts` is the single check all three share. It names the
+variables actually missing rather than making you guess between them, so the
+500 body tells you which dashboard field to go fix. It returns names only,
+never values.
+
+Note the deadline this sits in front of: `weekly-rollover` reads the same two
+variables. If they are not visible to functions **in production**, the Tuesday
+18:00 ET job dies before it does anything and the week silently never opens.
+Confirm the production context before the season starts, not on the Tuesday.
+
 ---
 
 ## Installing and checking

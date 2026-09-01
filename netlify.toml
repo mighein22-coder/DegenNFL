@@ -20,7 +20,25 @@
   status = 200
 
 [build.environment]
-  NODE_VERSION = "20"
+  # 22, not 20, and this is load-bearing rather than housekeeping.
+  #
+  # @supabase/supabase-js requires a native `WebSocket`, which Node only gained
+  # at 22. `createClient` constructs a RealtimeClient in its own constructor —
+  # before any query, and whether or not realtime is ever used — so on Node 20
+  # every service-role function throws at the point it builds its client:
+  #
+  #   Error: Node.js detected but native WebSocket not found.
+  #     at WebSocketFactory.getWebSocketConstructor
+  #     at new RealtimeClient2 ... at createClient ... at Runtime.handler
+  #
+  # which surfaces as a 502 from admin-activate-week, sync-week and
+  # weekly-rollover alike. There is no way to opt out of that constructor, so
+  # the runtime has to satisfy it.
+  #
+  # The browser half never saw this: browsers have had WebSocket forever. It is
+  # specific to the Lambda runtime, which is why it appeared only once the
+  # functions could get far enough to build a client at all.
+  NODE_VERSION = "22"
 
 # Environment variables (set these in the Netlify dashboard)
 #

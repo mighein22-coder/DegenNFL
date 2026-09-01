@@ -59,6 +59,22 @@ export function readSupabaseEnv(): SupabaseEnvResult {
   if (!serviceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
 
   if (missing.length > 0) {
+    // Log-only, and NAMES ONLY — never values, and this never reaches the HTTP
+    // response. It separates the two states the message above cannot: a
+    // variable that is genuinely unset, versus one that is set in the dashboard
+    // but did not reach this deploy. Netlify injects env vars into a function's
+    // configuration when the deploy is built, so editing a variable does not
+    // change a deploy that already exists — it takes a redeploy. An empty list
+    // here alongside a working client bundle is that second case.
+    const visible = Object.keys(process.env)
+      .filter(name => /SUPABASE/i.test(name))
+      .sort();
+    console.error(
+      `[ENV] SUPABASE-ish names visible to this function: ${
+        visible.length > 0 ? visible.join(', ') : '(none)'
+      }`
+    );
+
     return {
       ok: false,
       missing,

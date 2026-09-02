@@ -43,7 +43,47 @@ since being a build-time value is its whole job. (Scopes are a Pro/Enterprise
 feature. This site is on the free plan, where every variable applies to all
 scopes and there is no selector — so on this site, scope is never the answer.)
 
-### `SUPABASE_SERVICE_ROLE_KEY` reaches no function, in any context
+### Functions must run Node 22, and a deploy will lie to you about it
+
+`@supabase/supabase-js` needs a native `WebSocket`, which Node has from 22.
+`createClient` builds a `RealtimeClient` in its own constructor — before any
+query, and whether or not realtime is used — so on an older runtime every
+service-role function throws where it builds its client and Netlify returns a
+bare 502.
+
+**Raising `NODE_VERSION` in `netlify.toml` does not fix this on its own.**
+Netlify reuses function bundles when only configuration changed, so a
+config-only deploy reports complete success while the functions keep the
+runtime they were originally built with. The deploy record is where this shows:
+
+```
+"All files already uploaded by a previous deploy with the same commits"
+"r": "nodejs20.x"
+```
+
+Two things are needed together:
+
+1. `AWS_LAMBDA_JS_RUNTIME = nodejs22.x` as a project environment variable. This
+   pins the functions runtime, and it can **only** be set through the Netlify
+   UI, CLI or API — never `netlify.toml`.
+2. A deploy that actually rebuilds the bundles: either *Clear cache and deploy
+   site*, or any commit touching function source. Changing
+   `_shared/supabaseEnv.ts` rebuilds all three at once, since they all import it.
+
+`readSupabaseEnv` now checks for `WebSocket` before touching credentials and
+reports the Node version it is running on, so a recurrence names itself instead
+of arriving as a 502.
+
+To check the runtime without deploying, read the deploy record's
+`available_functions[].r` field, which is the authoritative stamp.
+
+### Historical: `SUPABASE_SERVICE_ROLE_KEY` reaches no function, in any context
+
+**Resolved 2026-09-01** — the variable had never been added to the `degennfl`
+site. It is now set with scopes `builds/functions/runtime` and values for
+production, deploy-preview and branch-deploy. The diagnosis below is kept
+because the reasoning is reusable, and because it records a wrong turn worth
+not repeating.
 
 **OPEN as of 2026-09-01, and it blocks the season.** Every service-role function
 500s — on deploy previews *and on production* — with

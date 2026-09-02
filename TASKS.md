@@ -42,20 +42,30 @@ Read `PLANNING.md` for why things are shaped the way they are.
       `VITE_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
       **No `VITE_`-prefixed secrets** — Vite inlines those into the public
       bundle, which is how the NHL app leaked its sync secret.
-- [ ] **`SUPABASE_SERVICE_ROLE_KEY` reaches NO function, production included.
-      THIS BLOCKS THE SEASON.** Confirmed 2026-09-01 after merging #4:
-      production and deploy previews return the same diagnostic — 37 variables
-      delivered, both `VITE_` Supabase ones present, the service-role key absent,
-      no misspelled variant. Scope, deploy context, typo, stale deploy and
-      Netlify's sensitive-variable policy are each ruled out by evidence; see
-      `docs/OPERATIONS.md`. What is left is that it is not set on the `degennfl`
-      site — never saved, saved on another site or team, or a shared variable
-      not linked here. List the variables and read the name; do not confirm it
-      by opening the variable you expect to find.
-      - **Deadline Tuesday 8 Sep, 18:00 ET.** `weekly-rollover` runs on this
-        key. Until it is set that job dies before doing anything, week 1 never
-        opens, and nothing surfaces it — a failing cron is silent. Activation,
-        score sync and grading are blocked by the same thing.
+- [X] **Service-role functions work on production.** Fixed 2026-09-01. Two
+      independent faults, stacked, which is why it took all afternoon: the
+      second was invisible until the first was fixed.
+      - [X] `SUPABASE_SERVICE_ROLE_KEY` was never on the `degennfl` site. Now
+            set, scopes `builds/functions/runtime`, values for production,
+            deploy-preview and branch-deploy.
+      - [X] Functions ran `nodejs20.x`; supabase-js needs a native WebSocket,
+            which Node has from 22. Raising `NODE_VERSION` did nothing because
+            **Netlify reuses function bundles when only config changed** — the
+            deploy succeeds and the bundles keep their old runtime.
+            `AWS_LAMBDA_JS_RUNTIME=nodejs22.x` (UI/CLI/API only, never
+            netlify.toml) plus a source change to force a rebuild fixed it.
+      - Verified by an unauthenticated POST to `admin-activate-week` returning
+        401 rather than 500/502: the runtime guard passed, the credentials were
+        read, the client constructed, and the auth gate answered.
+- [ ] **An integration test that constructs a service-role client.** Every
+      failure in the sequence above was invisible to `npm run typecheck`,
+      `npm run test` and `npm run build`, because nothing in the suite builds a
+      client or invokes a function — so all three had to be found in production,
+      one at a time, each hidden behind the last. A single test that calls
+      `createClient` against the real project and issues one trivial query would
+      have caught the runtime fault outright, and caught the missing credential
+      as a clear failure rather than a 500. Worth more than any further unit
+      tests of pure logic, which is the part already well covered.
 - [ ] Tighten `@supabase/supabase-js` in `netlify/functions/package.json`. It
       declares `^2.0.0` while `src` declares `^2.89.0`; the range resolved to
       2.112.4, which requires Node 22 for native WebSocket and broke every

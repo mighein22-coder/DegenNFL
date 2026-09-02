@@ -140,14 +140,20 @@ const App: React.FC = () => {
 
       <main className="flex-1 p-4 pb-20 md:p-8 md:pb-8">
         <Routes>
-          <Route path="/" element={<DashboardView />} />
+          {/* Past the guard above, `profile` is non-null — and a profile IS
+              membership, so every screen below can take it as a given rather
+              than each re-deriving who is signed in. */}
+          <Route path="/" element={<DashboardView profile={profile} />} />
           <Route path="/picks" element={<PicksPage />} />
-          <Route path="/matrix" element={<ResultsView />} />
-          <Route path="/affinity" element={<TeamStatsView />} />
-          <Route path="/standings" element={<StandingsView />} />
-          <Route path="/history" element={<MyHistoryView />} />
-          <Route path="/settings" element={<SettingsView />} />
-          {profile?.role === 'admin' && <Route path="/admin" element={<AdminView />} />}
+          <Route path="/matrix" element={<ResultsView profile={profile} />} />
+          <Route path="/affinity" element={<TeamStatsView profile={profile} />} />
+          <Route path="/standings" element={<StandingsView profile={profile} />} />
+          <Route path="/history" element={<MyHistoryView profile={profile} />} />
+          <Route
+            path="/settings"
+            element={<SettingsView profile={profile} onProfileUpdated={refreshProfile} />}
+          />
+          {profile.role === 'admin' && <Route path="/admin" element={<AdminView />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

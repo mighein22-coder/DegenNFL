@@ -93,12 +93,28 @@ Read `PLANNING.md` for why things are shaped the way they are.
       path is a single statement for the season rather than one per member.
 - [ ] Check the Supabase project has email signups ENABLED. Self-serve signup
       cannot work without it, and nothing in the repo can verify it.
-- [ ] Run `/picks` against a real Supabase. It has never been executed — there
-      is no `.env.local` in the repo, so it typechecks and builds but has not
-      loaded a row. Do this before 8 Sep.
-- [ ] Build the real views — each stub under `src/components/views/` lists what
-      it needs. Rough order of value: Dashboard, Standings, League Matrix,
-      My History, Team Affinity, Settings, Admin.
+- [x] Run `/picks` against a real Supabase. Week 1 picks display after the
+      Admin activate-week button was pressed. Confirmed 2026-09-02.
+- [ ] **Run the other six screens against a real Supabase.** Same gap `/picks`
+      had: they typecheck, build and pass their unit tests, but nothing local
+      has loaded a row into them — there is still no `.env.local` in the repo.
+      The reads they add over `/picks` are `getAllPicks`, `getProfiles`,
+      `getAllWeeks`, `getGamesForWeeks`, `updateProfile` and the `team-records`
+      function. Standings and the Matrix are the two to look at first: both
+      depend on `picks_select_visible` returning other members' picks only once
+      a game has kicked off, which no local test can exercise.
+- [x] Build the real views. Every member-facing screen is wired to data:
+      Dashboard, Standings, League Matrix, My History, Team Affinity and
+      Settings. `ViewStub` is deleted. Admin is real but not finished — the two
+      remaining jobs are listed below and on the panel itself.
+      - [x] The derivations live in `src/lib/` as pure functions with tests
+            (`sheet.ts`, `history.ts`, `affinity.ts`), not inside components.
+            `buildHistory` and `computeStandings` are asserted to agree on what
+            a segment totals — two code paths over the same week ids, and a
+            member seeing one number on their history page and another in the
+            table they are ranked by is the failure that would follow.
+      - [x] Batched reads. `getGamesForWeeks` is one `.in()` for the whole
+            season, which is the N+1 the NHL app's history screen had.
 - [ ] Admin panel: an input calling `setSpread(gameId, rawSpread)` for any game
       that opened without a line. The service function exists; this is the UI
       for it.
@@ -110,7 +126,6 @@ Read `PLANNING.md` for why things are shaped the way they are.
 - [ ] Verify `weekly-rollover` against the live project once the schema is
       applied — activate a week, confirm 16 games and 16 hooked spreads, then
       re-run and confirm it changes nothing.
-- [ ] Delete `ViewStub.tsx` once the last view is real.
 
 ## Testing
 
@@ -136,7 +151,34 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ---
 
-## Done (this session)
+## Done (views session, 2026-09-02)
+
+- [x] Six member-facing screens wired to data, replacing their stubs. Each one
+      is a thin container over a pure derivation; nothing aggregates in a
+      component.
+- [x] `summarizeSheet` — the Dashboard's answer to a question that has no
+      yes/no answer under per-game locking. Three picks locked in on Thursday
+      and two still open is neither submitted nor unsubmitted, so the status is
+      derived (`NOT_OPEN` / `EMPTY` / `PARTIAL` / `COMPLETE` / `LOCKED`) with
+      the counts kept alongside. `LOCKED` deliberately outranks `COMPLETE`.
+- [x] The Dashboard shows BOTH deadlines. The next kickoff usually bites days
+      before the Sunday 13:00 ET lock; showing only the weekly one tells a
+      member they can still change a Thursday pick they cannot.
+- [x] The Matrix leaves an unrevealed cell blank and says so, rather than
+      inventing a reason for it. RLS means an unrevealed pick is not in the
+      data at all, and only its owner can tell 'not picked' from 'not shown'.
+- [x] Team Affinity lists only teams the member has picked — the bye-week rule.
+      A table of 32 would show four to six holes a week that read as missing
+      results.
+- [x] The Dashboard fires `sync-week` after first paint, as `/picks` does. It
+      is the page most often opened, and scores only land because somebody
+      opens one.
+- [x] `useLoader` / `useNow` — the load-cancel-error-reload shape `PicksPage`
+      grew by hand, and a ticking clock so a countdown left open goes down.
+- [x] 108 unit tests passing (30 new); `npm run build` and `npm run typecheck`
+      clean.
+
+## Done (previous session)
 
 - [x] `/picks` wired: `PicksPage` loads the week, its games and the member’s
       picks, renders `PicksView`, and saves through `save_picks`. It also

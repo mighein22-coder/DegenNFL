@@ -22,9 +22,13 @@ import type { Game, Pick, Week } from '../types';
  * build` never surfaced (it does not typecheck). Hence `npm run typecheck` in
  * CI, and hence the `*Row` naming.
  *
- * SCOPE NOTE: this is the scaffold's version. The read paths and the pick-save
- * path are real; the aggregate views (team stats, affinity) are not written yet
- * and are marked below. See TASKS.md.
+ * SCOPE NOTE: every read the member-facing screens need is here. There is
+ * deliberately no aggregate query — standings, history and team affinity are
+ * all derived in `src/lib/` from two flat reads (`getProfiles` and
+ * `getAllPicks`), because at pool scale that is a couple of thousand rows and
+ * a pure function is testable without a database attached. What is NOT here is
+ * anything that writes a spread or a score: those columns are service-role
+ * only, and the functions under netlify/ hold them.
  */
 
 // ---------------------------------------------------------------------------
@@ -237,6 +241,28 @@ export async function getGamesForWeek(weekId: string): Promise<Game[]> {
 }
 
 /**
+ * Games for several weeks at once.
+ *
+ * One `.in()` rather than a request per week. The NHL app's history screen
+ * looped `getGamesForWeek` inside a render and produced a textbook N+1 — a
+ * member seventeen weeks into the season paid seventeen round trips to see a
+ * page that could have been one. Both screens that span weeks (My History and
+ * Team Affinity) go through here.
+ */
+export async function getGamesForWeeks(weekIds: string[]): Promise<Game[]> {
+  if (weekIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('games')
+    .select('*')
+    .in('week_id', weekIds)
+    .order('start_time', { ascending: true });
+
+  if (error) throw error;
+  return (data as GameRow[]).map(toGame);
+}
+
+/**
  * Seeds a week's schedule from the nfl-schedule function.
  *
  * Note what is NOT written: the spread. The column grants in 0001_init.sql make
@@ -382,6 +408,67 @@ export async function getProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase.from('profiles').select('*').order('name');
   if (error) throw error;
   return data as Profile[];
+}
+
+/**
+ * Update the caller's own display name and avatar.
+ *
+ * These are the only two columns a member may write, and the grant in
+ * 0001_init.sql says so by name — `role` is absent from it, so a member cannot
+ * promote themselves even by sending the column. `updated_at` is in the grant
+ * because there is no trigger maintaining it on this table; the client is what
+ * moves it, so it is set here rather than left to drift.
+ *
+ * The RLS policy restricts the row to `auth.uid() = id`, so the id here is a
+ * matter of addressing the right row, not of authorisation.
+ */
+export async function updateProfile(
+  userId: string,
+  updates: { name?: string; avatar?: string | null }
+): Promise<Profile> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as Profile;
+}
+
+/**
+ * Change the caller's password.
+ *
+ * Goes through Supabase auth rather than anything in this schema — passwords
+ * live in `auth.users`, which nothing in `public` can see or write.
+ */
+export async function updatePassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Team records
+// ---------------------------------------------------------------------------
+
+/**
+ * Each team's own W-L (or W-L-T) record, proxied through the team-records
+ * function to avoid the browser CORS block on ESPN.
+ *
+ * Unrelated to how the pool scores: a tied GAME still leaves every pick a clear
+ * win or loss, because the spread is hooked. The tie only ever shows up here.
+ *
+ * Callers should treat a failure as a missing column rather than a failed page
+ * — the response shape is ESPN's and undocumented (see the TODO in
+ * team-records.ts), so this is the read most likely to come back empty.
+ */
+export async function getTeamRecords(): Promise<Record<string, string>> {
+  const response = await fetch('/.netlify/functions/team-records');
+  if (!response.ok) {
+    throw new Error(`team-records returned ${response.status}`);
+  }
+  return (await response.json()) as Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------

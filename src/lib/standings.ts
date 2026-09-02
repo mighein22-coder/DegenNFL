@@ -25,8 +25,14 @@ export interface StandingsScope {
   segment?: number | null;
 }
 
-/** The latest week that has at least one scored pick, if any. */
-function mostRecentScoredWeekId(picks: Pick[]): string | undefined {
+/**
+ * The latest week that has at least one scored pick, if any.
+ *
+ * Exported because the Standings screen has to NAME the week its weekly column
+ * covers. Deriving it a second time in the view would let the header and the
+ * numbers under it drift apart.
+ */
+export function mostRecentScoredWeekId(picks: Pick[]): string | undefined {
   let latest: string | undefined;
   for (const pick of picks) {
     if (pick.result !== 'PENDING' && (latest === undefined || pick.weekId > latest)) {

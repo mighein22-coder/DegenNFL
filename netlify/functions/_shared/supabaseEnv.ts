@@ -35,6 +35,27 @@ export interface SupabaseEnv {
 }
 
 /**
+ * The Lambda runtime is new enough for supabase-js to construct a client.
+ *
+ * `createClient` builds a `RealtimeClient` inside its own constructor — before
+ * any query, and whether or not realtime is used — and that needs a native
+ * `WebSocket`, which Node only has from 22. On an older runtime it throws
+ * "Node.js detected but native WebSocket not found" from deep inside the
+ * library, which Netlify surfaces as a bare 502 with no hint of the cause.
+ *
+ * Checked here so the failure names itself instead. This is not hypothetical
+ * tidiness: it cost an afternoon on 2026-09-01, and the state that produced it
+ * is easy to re-enter, because **Netlify reuses function bundles when only
+ * configuration changed**. Raising `NODE_VERSION` therefore does not restamp
+ * existing bundles — they keep the runtime they were built with, and the deploy
+ * looks entirely successful. `AWS_LAMBDA_JS_RUNTIME` is the setting that pins
+ * it, and it can only be set through the Netlify UI/CLI/API, never netlify.toml.
+ */
+function webSocketAvailable(): boolean {
+  return typeof (globalThis as { WebSocket?: unknown }).WebSocket !== 'undefined';
+}
+
+/**
  * What the runtime environment looks like, described without naming anything.
  *
  * Deploy-preview function logs do not appear on the project's Functions log
@@ -57,6 +78,8 @@ export interface EnvDiagnostic {
   totalCount: number;
   /** A name that normalises to SUPABASE_SERVICE_ROLE_KEY but is not equal to it. */
   nearMissPresent: boolean;
+  /** The Lambda's Node version, e.g. "v22.11.0". Never sensitive, often decisive. */
+  nodeVersion: string;
 }
 
 export type SupabaseEnvResult =
@@ -66,6 +89,20 @@ export type SupabaseEnvResult =
 /** Strips case, whitespace and separators, so `supabase service-role key ` collides. */
 function normalise(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Builds the non-identifying snapshot returned with every failure. */
+function describeEnv(): EnvDiagnostic {
+  const names = Object.keys(process.env);
+  const wanted = normalise('SUPABASE_SERVICE_ROLE_KEY');
+  return {
+    supabaseNameCount: names.filter(name => /SUPABASE/i.test(name)).length,
+    totalCount: names.length,
+    nearMissPresent: names.some(
+      name => name !== 'SUPABASE_SERVICE_ROLE_KEY' && normalise(name) === wanted
+    ),
+    nodeVersion: process.version
+  };
 }
 
 /**
@@ -78,6 +115,26 @@ function normalise(name: string): string {
  * policy in the schema.
  */
 export function readSupabaseEnv(): SupabaseEnvResult {
+  // Runtime first. The credentials being perfect does not help if constructing
+  // the client throws, and that throw is opaque — see webSocketAvailable().
+  if (!webSocketAvailable()) {
+    const message =
+      `Server misconfiguration: this function is running Node ${process.version}, ` +
+      'which has no native WebSocket. @supabase/supabase-js requires one because ' +
+      'createClient builds a RealtimeClient in its constructor, so the runtime ' +
+      'must be Node 22 or later. Set AWS_LAMBDA_JS_RUNTIME=nodejs22.x in the ' +
+      'Netlify UI/CLI/API — not netlify.toml — and redeploy. Raising NODE_VERSION ' +
+      'alone is not enough: Netlify reuses function bundles when only config ' +
+      'changed, and a reused bundle keeps the runtime it was built with.';
+    console.error(`[ENV] ${message}`);
+    return {
+      ok: false,
+      missing: [],
+      message,
+      diagnostic: describeEnv()
+    };
+  }
+
   // VITE_-prefixed first, matching how the site is configured today; the
   // unprefixed name is the fallback. The URL is public either way — it is in
   // the client bundle — so there is no secret in preferring one.
@@ -96,30 +153,19 @@ export function readSupabaseEnv(): SupabaseEnvResult {
     // configuration when the deploy is built, so editing a variable does not
     // change a deploy that already exists — it takes a redeploy. An empty list
     // here alongside a working client bundle is that second case.
-    const names = Object.keys(process.env);
-    const visible = names.filter(name => /SUPABASE/i.test(name)).sort();
-
-    // The log still gets the full names — it is private to the project owner,
-    // and on a production deploy it is the fastest read of all.
+    // The log gets the full names — it is private to the project owner, and on
+    // a production deploy it is the fastest read of all.
+    const visible = Object.keys(process.env).filter(name => /SUPABASE/i.test(name)).sort();
     console.error(
       `[ENV] SUPABASE-ish names visible to this function: ${
         visible.length > 0 ? visible.join(', ') : '(none)'
       }`
     );
 
-    const wanted = normalise('SUPABASE_SERVICE_ROLE_KEY');
-    const diagnostic: EnvDiagnostic = {
-      supabaseNameCount: visible.length,
-      totalCount: names.length,
-      nearMissPresent: names.some(
-        name => name !== 'SUPABASE_SERVICE_ROLE_KEY' && normalise(name) === wanted
-      )
-    };
-
     return {
       ok: false,
       missing,
-      diagnostic,
+      diagnostic: describeEnv(),
       message:
         `Server misconfiguration: ${missing.join(' and ')} ` +
         `${missing.length === 1 ? 'is' : 'are'} not visible to this function. ` +

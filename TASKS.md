@@ -96,12 +96,9 @@ Read `PLANNING.md` for why things are shaped the way they are.
       `redeem_invite()` the only way a profile is created, which closes a real
       hole: with signups enabled anyone could previously sign up and insert
       their own profile, and a profile is membership.
-- [ ] Admin UI for invites. `createInvite()`, `revokeInvite()`, `listInvites()`
-      and `listInviteClaims()` exist and are admin-only in the database. Less
-      urgent than it was: one reusable code covers the whole pool, so the SQL
-      path is a single statement for the season rather than one per member.
-- [ ] Check the Supabase project has email signups ENABLED. Self-serve signup
-      cannot work without it, and nothing in the repo can verify it.
+- [X] Check the Supabase project has email signups ENABLED. Confirmed by Mike
+      on the project itself — nothing in the repo can verify it, which is why
+      this stayed open so long.
 - [x] Run `/picks` against a real Supabase. Week 1 picks display after the
       Admin activate-week button was pressed. Confirmed 2026-09-02.
 - [ ] **Run the other six screens against a real Supabase.** Same gap `/picks`
@@ -167,6 +164,11 @@ Read `PLANNING.md` for why things are shaped the way they are.
 - [ ] Adopt the shared tokens in FrozenDegenerates: `node scripts/sync-tokens.mjs
       --push ../FrozenDegenerates`, add a `brand.css` there filling the same
       slots with the `ice` ramp, then rename its `ice-*` classes to `brand-*`.
+- [ ] Admin UI for invites. `createInvite()`, `revokeInvite()`, `listInvites()`
+      and `listInviteClaims()` exist and are admin-only in the database. Moved
+      here from Application by Mike: one reusable code covers the whole pool, so
+      the SQL path is a single statement for the season rather than one per
+      member. It buys convenience, not capability.
 
 ---
 

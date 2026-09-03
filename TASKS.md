@@ -9,10 +9,19 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ## Blocking everything downstream
 
-- [ ] **Apply the schema to `degen-NFL-pool` and verify it live.** The
-      migration passes 52 assertions against a throwaway Postgres 17, but it
-      has not been run against the real project. Nothing else on this list can
-      be exercised until it has. See Infrastructure below.
+- [X] **Apply the schema to `degen-NFL-pool` and verify it live.** Done — see
+      Infrastructure below, where all three steps are ticked. The pool is live:
+      Week 1 was activated from the Admin panel and its picks display. This
+      entry sat unticked long after it was true, claiming the whole list was
+      blocked while the app was already serving rows.
+
+- [ ] **Reset the database before Tue 8 Sep 18:00 ET.** Mike's plan as of
+      2026-09-02. That deadline is not arbitrary: Week 1 was activated early to
+      test, which froze its lines permanently at an early-September market, and
+      **the Tuesday cron will not re-price a line that is already set** — it
+      will find Week 1 done and leave it alone. So a reset after that moment
+      leaves the pool playing Week 1 on stale numbers for real. Teardown SQL is
+      in `docs/OPERATIONS.md`.
 
 - [X] **Run the ESPN spike.** Done 2026-08-26 — see *What the spike found* in
       `PLANNING.md`. All three questions answered; the third one (lines vanish
@@ -103,6 +112,11 @@ Read `PLANNING.md` for why things are shaped the way they are.
       function. Standings and the Matrix are the two to look at first: both
       depend on `picks_select_visible` returning other members' picks only once
       a game has kicked off, which no local test can exercise.
+      What the PR #9 deploy preview DID establish, and it is less than it
+      sounds: the bundle boots and the login screen renders with no console
+      error, which also proves the Supabase env vars are present on that deploy
+      (`src/lib/supabase.ts` throws at module load without them). Nothing past
+      the login screen was exercised.
 - [x] Build the real views. Every member-facing screen is wired to data:
       Dashboard, Standings, League Matrix, My History, Team Affinity and
       Settings. `ViewStub` is deleted. Admin is real but not finished — the two
@@ -123,9 +137,14 @@ Read `PLANNING.md` for why things are shaped the way they are.
             is still in the future, because activating early freezes that week's
             lines permanently at today's market and the cron will not re-price
             them. Teardown SQL is in `docs/OPERATIONS.md`.
-- [ ] Verify `weekly-rollover` against the live project once the schema is
-      applied — activate a week, confirm 16 games and 16 hooked spreads, then
-      re-run and confirm it changes nothing.
+- [ ] Verify `weekly-rollover` **on its cron** against the live project. The
+      schema is applied and the shared `activateWeek` has now run for real —
+      the Admin button seeded Week 1 and froze its lines — so what is left
+      unproven is the scheduled trigger itself and the idempotency claim:
+      let the Tuesday job fire, confirm 16 games and 16 hooked spreads, then
+      confirm a second run changes nothing. The double-fire matters because the
+      job is scheduled at BOTH 22:00 and 23:00 UTC to survive the November DST
+      change, so it genuinely runs twice every week.
 
 ## Testing
 

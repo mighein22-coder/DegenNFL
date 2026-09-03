@@ -432,22 +432,58 @@ these: MIN @ TB
 
 This happens when the book had the game OFF at capture time. That game is
 seeded and visible but **not pickable** — `game_has_line()` blocks it — so
-nobody can pick blind against a number that does not exist. You have until
-Sunday, not until kickoff.
+nobody can pick blind against a number that does not exist.
 
-Fix it from the Admin panel, which calls `setSpread(gameId, rawSpread)`, or
-directly:
+**The deadline is that game's own kickoff, not Sunday.** This section used to
+say you had until Sunday, and that is wrong under per-game locking:
+`pick_locked` is `now() >= g.start_time or now() >= w.final_lock_at`, so a line
+supplied after kickoff arrives on a game nobody can pick any more. The sheet
+lock is only the deadline for the last game of the week. Week 1 of 2026 is the
+worst case in the season — the sheet opens Tuesday 18:00 ET and the opener
+kicks off Wednesday 20:20 ET, so a missing line on that game leaves about 26
+hours, not five days.
+
+Fix it from the Admin panel, which calls `setSpread(gameId, rawSpread)`.
+
+### ...and the SQL editor is not a fallback here
+
+`admin_set_spread` gates on `auth.uid()`:
 
 ```sql
--- Pass the RAW line from the HOME team's point of view; the function hooks it.
--- -3 is stored as -3.5, because the half point always goes against the
--- favourite. Admin-only, and it refuses to touch a line already frozen.
-select public.admin_set_spread('<game uuid>', -3);
+if not exists (
+  select 1 from public.profiles where id = auth.uid() and role = 'admin'
+) then raise exception 'admin_set_spread: admins only';
 ```
 
-Prefer that over an `update`: `games.spread` is not writable by any client
-grant, and `admin_set_spread` applies the hook and the "never overwrite"
-guard for you.
+The SQL editor is a superuser session with **nobody logged in**, so `auth.uid()`
+is null and the call refuses — the same trap documented above for
+`admin_create_invite`. Invites have a raw-insert escape because `invites` is an
+ordinary table. Spreads do not: the function is the whole path, which makes the
+Admin panel UI load-bearing rather than a convenience.
+
+If you must do it from SQL, impersonate an admin session in the same
+transaction so `auth.uid()` resolves:
+
+```sql
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"<your profiles.id>","role":"authenticated"}';
+-- RAW line from the HOME team's point of view; the function hooks it. -3 is
+-- stored as -3.5, because the half point always goes against the favourite.
+select public.admin_set_spread('<game uuid>', -3);
+commit;
+```
+
+Failing that, a superuser `update` works — column grants do not apply to a
+superuser — but you are then on the hook for both things the function does for
+you, so hook the number yourself and keep the guard:
+
+```sql
+update public.games
+   set spread = -3.5, spread_captured_at = now(), updated_at = now()
+ where id = '<game uuid>'
+   and spread is null;  -- never move a line already frozen
+```
 
 ### Closing a week
 

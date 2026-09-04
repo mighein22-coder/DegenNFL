@@ -108,6 +108,13 @@ export const GameCard: React.FC<GameCardProps> = ({
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {renderTeam(game.awayTeamId, false)}
+        {/* Away @ home, the way a schedule is written. Decorative to the eye,
+            but it is the only thing on the card that says which side is at
+            home, so it is spelled out for a screen reader rather than hidden. */}
+        <span className="self-center px-1 text-sm text-faint">
+          <span aria-hidden>@</span>
+          <span className="sr-only">at</span>
+        </span>
         {renderTeam(game.homeTeamId, true)}
       </div>
 

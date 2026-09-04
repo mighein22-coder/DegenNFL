@@ -189,20 +189,40 @@ export const PicksView: React.FC<PicksViewProps> = ({
   const openGames = games.filter(g => !lockedByGameId.get(g.id));
   const closedGames = games.filter(g => lockedByGameId.get(g.id));
 
+  // One control, rendered twice — beside the header and again at the foot of
+  // the sheet, so a long week is never a scroll away from saving. Built here
+  // rather than written out twice: the two must never disagree about whether
+  // the sheet is saveable, or one of them lies about it.
+  const saveButton = (size: 'md' | 'lg', className: string) => (
+    <Button
+      size={size}
+      className={className}
+      isLoading={saving}
+      disabled={complete.length === 0}
+      onClick={handleSave}
+    >
+      Save picks
+    </Button>
+  );
+
   return (
     <section className="mx-auto max-w-3xl pb-24">
-      <header className="mb-6">
-        <h1 className="font-display text-4xl tracking-wide text-ink">
-          Week {week.weekNumber}
-        </h1>
-        <p className="mt-2 text-muted">
-          {totalPicked} of {PICKS_PER_WEEK} picked
-          {' · '}
-          {spent.bonus > 0 ? 'bonus set' : 'bonus not set'}
-          {' · '}
-          sheet closes {getTimeUntil(finalLock, now)}
-          {lockedPicks.length > 0 && ` · ${lockedPicks.length} already locked in`}
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-4xl tracking-wide text-ink">
+            Week {week.weekNumber}
+          </h1>
+          <p className="mt-2 text-muted">
+            {totalPicked} of {PICKS_PER_WEEK} picked
+            {' · '}
+            {spent.bonus > 0 ? 'bonus set' : 'bonus not set'}
+            {' · '}
+            sheet closes {getTimeUntil(finalLock, now)}
+            {lockedPicks.length > 0 && ` · ${lockedPicks.length} already locked in`}
+          </p>
+        </div>
+
+        {openGames.length > 0 && saveButton('md', 'shrink-0')}
       </header>
 
       {openGames.length > 0 && (
@@ -268,15 +288,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
 
       {openGames.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 border-t border-line bg-surface-sunken p-4 md:static md:mt-6 md:border-0 md:bg-transparent md:p-0">
-          <Button
-            size="lg"
-            className="w-full"
-            isLoading={saving}
-            disabled={complete.length === 0}
-            onClick={handleSave}
-          >
-            Save picks
-          </Button>
+          {saveButton('lg', 'w-full')}
         </div>
       )}
     </section>

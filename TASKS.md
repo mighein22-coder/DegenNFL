@@ -147,6 +147,13 @@ Read `PLANNING.md` for why things are shaped the way they are.
       this stayed open so long.
 - [x] Run `/picks` against a real Supabase. Week 1 picks display after the
       Admin activate-week button was pressed. Confirmed 2026-09-02.
+- [x] Two pick-sheet changes Mike asked for in issue #14. A second **Save
+      picks** button beside the week header, so a full sheet is not a scroll
+      away from saving, and an **@** between the away and home cards, which is
+      the only thing on a card that says which side is at home. Both buttons
+      are one `saveButton` helper rather than two copies — they must never
+      disagree about whether the sheet is saveable. Checked by rendering
+      `PicksView` against fake games, since there is still no `.env.local`.
 - [ ] **Run the other six screens against a real Supabase.** Same gap `/picks`
       had: they typecheck, build and pass their unit tests, but nothing local
       has loaded a row into them — there is still no `.env.local` in the repo.

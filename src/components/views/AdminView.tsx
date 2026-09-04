@@ -32,7 +32,7 @@ import { WEEK_COUNT } from '../../constants';
 /** The remaining unbuilt admin jobs. Delete each line as it becomes a control. */
 const STILL_NEEDED = [
   'Invites: createInvite() mints one reusable code for the whole pool, revokeInvite(code) shuts it, listInvites() / listInviteClaims() show what is open and who came in on it. All in lib/supabaseService.ts and admin-only in the database. Until this is built, one SQL statement covers the whole season — see docs/OPERATIONS.md.',
-  "A list of that week's games with no spread, each with an input calling setSpread(gameId, rawSpread). Those games are unpickable until a line exists, so this is the one admin job with a Sunday deadline. Enter the RAW line from the home team's point of view — the database hooks it to a half point.",
+  "A list of that week's games with no spread, each with an input calling setSpread(gameId, rawSpread). Those games are unpickable until a line exists, and the deadline is EACH GAME'S OWN KICKOFF, not the Sunday sheet lock — pick_locked fires on start_time first, so a line set after kickoff lands on a game nobody can pick. Enter the RAW line from the home team's point of view — the database hooks it to a half point. There is no SQL fallback: admin_set_spread reads auth.uid(), which is null in the SQL editor, so this panel is the only place it can be done.",
   'Week status toggle (OPEN / LOCKED / COMPLETED). Note status does NOT control the deadline — final_lock_at is derived from the week id and cannot be moved from a client at all.',
   "Score corrections must go through a server function under the service-role key; the admin's own session cannot write those columns either."
 ];

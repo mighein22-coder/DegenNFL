@@ -16,12 +16,44 @@ Read `PLANNING.md` for why things are shaped the way they are.
       blocked while the app was already serving rows.
 
 - [ ] **Reset the database before Tue 8 Sep 18:00 ET.** Mike's plan as of
-      2026-09-02. That deadline is not arbitrary: Week 1 was activated early to
-      test, which froze its lines permanently at an early-September market, and
-      **the Tuesday cron will not re-price a line that is already set** — it
-      will find Week 1 done and leave it alone. So a reset after that moment
-      leaves the pool playing Week 1 on stale numbers for real. Teardown SQL is
-      in `docs/OPERATIONS.md`.
+      2026-09-02. Week 1 was activated early to test, which froze its lines
+      permanently at an early-September market, and **`activateWeek` never
+      re-prices a line that is already set** (`if (game.spread != null)
+      continue`) — so until the week is torn down, no amount of re-running
+      fixes it. Teardown SQL is in `docs/OPERATIONS.md`.
+
+      **The binding constraint is picks, not the cron.** This entry used to say
+      the deadline was the Tuesday job. It is not: the job fires at both 22:00
+      and 23:00 UTC and week 1's activation window admits both, so a reset at
+      18:30 ET would still be reseeded fresh at 19:00 ET — and the Admin
+      activate button reseeds at any hour regardless. What cannot be undone is
+      member picks, which **cascade-delete from `games`**. So the real deadline
+      is *before the first member saves a sheet*, which is the moment the sheet
+      opens — Tue 8 Sep 18:00 ET. Same date, and it tells you what to do if you
+      slip: never tear down a live sheet, and if both cron firings are missed,
+      reset and press Activate by hand rather than writing off the week.
+
+      Do it **Sun 6 or Mon 7 Sep**, after signups (below) and well clear of
+      Tuesday. The teardown deletes `games` and `weeks` only, so `profiles`,
+      `invites` and `invite_claims` all survive it — members signed up
+      beforehand keep their accounts.
+
+- [ ] **Mint the invite code and send it, before the reset.** Not previously on
+      this list at all — the *Admin invites UI* is deferred to Later, which is
+      correct, but the one SQL statement that actually opens the pool was on
+      nobody's list. The signup flow itself is ready end to end: `LoginView`
+      takes the code, and `App.tsx` falls through to `RedeemInviteView` for the
+      member who confirms an email before redeeming, so this is genuinely
+      self-serve.
+
+      Two things bite. **Set an explicit expiry** — the default is 14 days, so
+      a code minted Tue 8 Sep dies 22 Sep, mid-season and mid-segment-one. And
+      **do it before the reset, not after**: the teardown leaves `profiles`
+      alone, and the Week 1 sheet is open only ~26 hours before its first game
+      locks, which is not the window in which to also be onboarding people.
+
+      Not `admin_create_invite()` — see `docs/OPERATIONS.md`, which covers both
+      why and the statement to use instead.
 
 - [X] **Run the ESPN spike.** Done 2026-08-26 — see *What the spike found* in
       `PLANNING.md`. All three questions answered; the third one (lines vanish
@@ -82,10 +114,24 @@ Read `PLANNING.md` for why things are shaped the way they are.
       `npm ci` is what actually pins it, so this is about the declared range no
       longer describing what the code needs — `^2.0.0` claims support for
       versions that cannot work.
-- [ ] Configure the subdomain.
+- [ ] Configure the subdomain. **Deferred past launch by Mike, 2026-09-04** —
+      week 1 goes out on the Netlify origin, and whether a custom domain
+      happens at all is a later call.
+
+      It carries a debt if it does happen. `LoginView` builds the reset link
+      from `window.location.origin`, so a mid-season domain change silently
+      moves the origin members arrive from — and until the new one is
+      allowlisted in Supabase, **every password reset dead-ends**, for
+      everybody, with nothing in the app to indicate why. So the domain and the
+      allowlist below are one job, not two, whenever it is done. Allowlist the
+      new origin before pointing anyone at it, and keep the Netlify origin
+      listed as well for anyone holding an older link.
+
 - [ ] Allowlist `/auth/callback` in Supabase → Authentication → URL
-      Configuration. No app change substitutes for this; password reset
-      dead-ends without it.
+      Configuration — on the Netlify origin, per the decision above. No app
+      change substitutes for this; password reset dead-ends without it. Verify
+      end to end against the deployed site rather than assuming, since the
+      failure is invisible until a member needs it.
 
 ## Application
 
@@ -114,6 +160,16 @@ Read `PLANNING.md` for why things are shaped the way they are.
       error, which also proves the Supabase env vars are present on that deploy
       (`src/lib/supabase.ts` throws at module load without them). Nothing past
       the login screen was exercised.
+
+      One limit worth knowing before starting: **production cannot exercise the
+      reveal path this week either.** `pick_revealed` is `pick_locked`, and no
+      Week 1 game kicks off until Wed 9 Sep, so every other member's pick stays
+      hidden and Standings and the Matrix only show their blank half. Reach the
+      other half on the *stale* Week 1, before the reset, where the data is
+      being deleted anyway: `games.start_time` has no guard trigger, so
+      backdating one game from the SQL editor reveals the picks on it. Two
+      accounts, two sheets, check the Matrix fills that column and leaves the
+      rest blank — then tear the week down as planned.
 - [x] Build the real views. Every member-facing screen is wired to data:
       Dashboard, Standings, League Matrix, My History, Team Affinity and
       Settings. `ViewStub` is deleted. Admin is real but not finished — the two
@@ -126,9 +182,21 @@ Read `PLANNING.md` for why things are shaped the way they are.
             table they are ranked by is the failure that would follow.
       - [x] Batched reads. `getGamesForWeeks` is one `.in()` for the whole
             season, which is the N+1 the NHL app's history screen had.
-- [ ] Admin panel: an input calling `setSpread(gameId, rawSpread)` for any game
-      that opened without a line. The service function exists; this is the UI
-      for it.
+- [ ] **Admin panel: an input calling `setSpread(gameId, rawSpread)` for any
+      game that opened without a line.** Launch-blocking, and more so than the
+      wording here used to suggest — this is not "the UI for a function that
+      already works". `admin_set_spread` gates on `auth.uid()`, which is null in
+      the SQL editor (a superuser session has nobody logged in), so it refuses
+      with `admin_set_spread: admins only` — the same trap `docs/OPERATIONS.md`
+      already documents for `admin_create_invite`. Invites have a raw-insert
+      escape; spreads do not. **The panel is the only working path.**
+
+      The deadline is also not what the panel said. `pick_locked` fires on
+      `start_time` before `final_lock_at`, so a missing line must be set before
+      **that game's own kickoff**. Week 1 2026 is the worst case of the season:
+      sheet opens Tue 18:00 ET, opener Wed 20:20 ET, so ~26 hours rather than
+      until Sunday. Both the panel string and `docs/OPERATIONS.md` said Sunday
+      and have been corrected.
       - [x] The `activateWeek(weekNumber)` button — the manual version of the
             Tuesday cron — is built. It warns when the chosen week's own Tuesday
             is still in the future, because activating early freezes that week's

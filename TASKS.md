@@ -170,6 +170,13 @@ Read `PLANNING.md` for why things are shaped the way they are.
       backdating one game from the SQL editor reveals the picks on it. Two
       accounts, two sheets, check the Matrix fills that column and leaves the
       rest blank — then tear the week down as planned.
+
+      **The Admin panel belongs in this sweep too**, and is the one place a
+      local check cannot substitute for: `admin_set_spread` refuses a session
+      that is not an admin, so the only proof the button works is pressing it
+      as Mike against a game with a null spread. The stale Week 1, before the
+      reset, is the free place to try it — set a line on a game there and
+      confirm the row disappears from the panel and the game becomes pickable.
 - [x] Build the real views. Every member-facing screen is wired to data:
       Dashboard, Standings, League Matrix, My History, Team Affinity and
       Settings. `ViewStub` is deleted. Admin is real but not finished — the two
@@ -182,21 +189,42 @@ Read `PLANNING.md` for why things are shaped the way they are.
             table they are ranked by is the failure that would follow.
       - [x] Batched reads. `getGamesForWeeks` is one `.in()` for the whole
             season, which is the N+1 the NHL app's history screen had.
-- [ ] **Admin panel: an input calling `setSpread(gameId, rawSpread)` for any
-      game that opened without a line.** Launch-blocking, and more so than the
-      wording here used to suggest — this is not "the UI for a function that
-      already works". `admin_set_spread` gates on `auth.uid()`, which is null in
-      the SQL editor (a superuser session has nobody logged in), so it refuses
-      with `admin_set_spread: admins only` — the same trap `docs/OPERATIONS.md`
-      already documents for `admin_create_invite`. Invites have a raw-insert
-      escape; spreads do not. **The panel is the only working path.**
+- [x] **Admin panel: an input calling `setSpread(gameId, rawSpread)` for any
+      game that opened without a line.** Built 2026-09-04. The panel now has one
+      week selector at the top and two controls under it: activate, and a
+      **Games with no line** card listing every game still waiting on one.
 
-      The deadline is also not what the panel said. `pick_locked` fires on
-      `start_time` before `final_lock_at`, so a missing line must be set before
-      **that game's own kickoff**. Week 1 2026 is the worst case of the season:
-      sheet opens Tue 18:00 ET, opener Wed 20:20 ET, so ~26 hours rather than
-      until Sunday. Both the panel string and `docs/OPERATIONS.md` said Sunday
-      and have been corrected.
+      It was never "the UI for a function that already works" —
+      `admin_set_spread` gates on `auth.uid()`, which is null in the SQL editor
+      (a superuser session has nobody logged in), so it refuses there with
+      `admin_set_spread: admins only`. Invites have a raw-insert escape; spreads
+      do not. **The panel is the only working path**, which is why it is on the
+      launch list rather than the convenience list.
+
+      Two things the build had to get right beyond the input itself:
+
+      - **The deadline is per game, and it is not always kickoff.** `pick_locked`
+        is `start_time` OR `final_lock_at`, so the moment a line stops being
+        worth setting is the EARLIER of the two — its own kickoff for a Thursday
+        or international game, the Sunday 13:00 ET sheet lock for a Sunday-night
+        or Monday one, which closes hours BEFORE that game kicks off. A panel
+        showing only kickoff would be wrong about roughly half the slate.
+        `findGamesWithoutLine` in `src/lib/missingLines.ts` derives it and sorts
+        by it; the tests assert it agrees with `isPickLocked` at four instants.
+      - **The write is irreversible**, so the row shows what would be stored
+        before the button is pressed, naming both teams (`Stored as -3.5 — TB
+        -3.5, MIN +3.5`). That is the only check on the two mistakes that matter:
+        the hook, and the sign. `parseSpreadInput` also refuses anything over 30
+        points — there is no range CHECK on the column, and `35` for `3.5` would
+        be a season-long wrong number with no way back short of a teardown.
+
+      `PicksPage`'s member-facing banner carried the same "before Sunday"
+      falsehood the panel and `docs/OPERATIONS.md` had already been corrected
+      for. It now names each game's own deadline.
+
+      NOT verified: nothing has rendered this against a browser or a real row —
+      same gap as the six screens below. `npm run typecheck`, `npm run build`
+      and 127 unit tests are what it has.
       - [x] The `activateWeek(weekNumber)` button — the manual version of the
             Tuesday cron — is built. It warns when the chosen week's own Tuesday
             is still in the future, because activating early freezes that week's

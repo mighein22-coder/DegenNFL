@@ -443,7 +443,19 @@ worst case in the season — the sheet opens Tuesday 18:00 ET and the opener
 kicks off Wednesday 20:20 ET, so a missing line on that game leaves about 26
 hours, not five days.
 
-Fix it from the Admin panel, which calls `setSpread(gameId, rawSpread)`.
+Fix it from the Admin panel. Set the week at the top and the **Games with no
+line** card below lists every game still waiting on one, soonest deadline
+first — which is not the order they appear on the sheet, because a Sunday-night
+game is deadlined by the 13:00 ET sheet lock while a Thursday one is deadlined
+by its own kickoff. Each row takes the RAW line from the home team's point of
+view and shows what would actually be stored before you press anything: type
+`-3` and it says `Stored as -3.5 — TB -3.5, MIN +3.5`. Check the team names,
+not just the number — a sign error inverts the game and cannot be undone, since
+`admin_set_spread` refuses to move a line once frozen.
+
+A row whose deadline has already passed is listed but has no input. Nothing can
+be picked on it any more, and because it was never pickable nobody holds a pick
+on it, so a line there would change nothing.
 
 ### ...and the SQL editor is not a fallback here
 

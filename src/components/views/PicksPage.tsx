@@ -9,7 +9,8 @@ import {
   syncWeek,
   type PickSubmission
 } from '../../lib/supabaseService';
-import { getWeekOpensAt, getFinalLockAt, formatETTime, getTimeUntil } from '../../lib/timezone';
+import { getWeekOpensAt, formatETTime, getTimeUntil } from '../../lib/timezone';
+import { findGamesWithoutLine } from '../../lib/missingLines';
 import type { Game, Pick, Week } from '../../types';
 
 /**
@@ -149,7 +150,11 @@ export const PicksPage: React.FC = () => {
     );
   }
 
-  const withoutLine = games.filter(g => g.spread == null);
+  // Each of these has its OWN deadline — the earlier of its kickoff and the
+  // Sunday sheet lock — so the banner names them one at a time. It used to say
+  // "an admin can add a line before Sunday", which is true only of the last
+  // game of the week and days wrong for a Thursday night one.
+  const withoutLine = findGamesWithoutLine(games, week.weekNumber);
 
   return (
     <>
@@ -158,14 +163,25 @@ export const PicksPage: React.FC = () => {
           <p className="text-ink">
             {withoutLine.length === 1
               ? 'One game has no line yet and cannot be picked:'
-              : `${withoutLine.length} games have no line yet and cannot be picked:`}{' '}
-            <span className="text-muted">
-              {withoutLine.map(g => `${g.awayTeamId} @ ${g.homeTeamId}`).join(', ')}
-            </span>
+              : `${withoutLine.length} games have no line yet and cannot be picked:`}
           </p>
-          <p className="mt-1 text-faint">
-            The book had these unopened when the week was set. An admin can add a
-            line before {formatETTime(getFinalLockAt(week.weekNumber), 'EEEE h:mm a zzz')}.
+          <ul className="mt-1 space-y-0.5 text-muted">
+            {withoutLine.map(row => (
+              <li key={row.game.id}>
+                {row.matchup} —{' '}
+                {row.locked ? (
+                  <span className="text-faint">closed without one</span>
+                ) : (
+                  <span className="text-faint">
+                    an admin has until{' '}
+                    {formatETTime(row.deadline, 'EEE h:mm a zzz')}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-faint">
+            The book had these unopened when the week was set.
           </p>
         </div>
       )}

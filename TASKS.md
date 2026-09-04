@@ -171,12 +171,12 @@ Read `PLANNING.md` for why things are shaped the way they are.
       accounts, two sheets, check the Matrix fills that column and leaves the
       rest blank — then tear the week down as planned.
 
-      **The Admin panel belongs in this sweep too**, and is the one place a
-      local check cannot substitute for: `admin_set_spread` refuses a session
-      that is not an admin, so the only proof the button works is pressing it
-      as Mike against a game with a null spread. The stale Week 1, before the
-      reset, is the free place to try it — set a line on a game there and
-      confirm the row disappears from the panel and the game becomes pickable.
+      **The Admin panel is already off this list** — Mike set a line through it
+      on 2026-09-04 and the hook applied, so the one read it adds
+      (`getGamesForWeek` for an arbitrary week) and its one write
+      (`admin_set_spread`) are both exercised against the live project. It is
+      named here only because it was the hardest case: no local check can stand
+      in for it, since the function refuses any session that is not an admin.
 - [x] Build the real views. Every member-facing screen is wired to data:
       Dashboard, Standings, League Matrix, My History, Team Affinity and
       Settings. `ViewStub` is deleted. Admin is real but not finished — the two
@@ -222,9 +222,13 @@ Read `PLANNING.md` for why things are shaped the way they are.
       falsehood the panel and `docs/OPERATIONS.md` had already been corrected
       for. It now names each game's own deadline.
 
-      NOT verified: nothing has rendered this against a browser or a real row —
-      same gap as the six screens below. `npm run typecheck`, `npm run build`
-      and 127 unit tests are what it has.
+      **Verified live by Mike, 2026-09-04**, against a real game with a null
+      spread: the row appears, the line is accepted, and the hook is applied.
+      That is the part no local check could reach — `admin_set_spread` refuses
+      any session that is not an admin, so pressing the button was the only
+      proof available. This entry said "NOT verified" for a few hours and is
+      corrected rather than left to rot, which is the failure mode most of the
+      stale entries in this file share.
       - [x] The `activateWeek(weekNumber)` button — the manual version of the
             Tuesday cron — is built. It warns when the chosen week's own Tuesday
             is still in the future, because activating early freezes that week's

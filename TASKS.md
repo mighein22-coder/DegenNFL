@@ -114,10 +114,24 @@ Read `PLANNING.md` for why things are shaped the way they are.
       `npm ci` is what actually pins it, so this is about the declared range no
       longer describing what the code needs — `^2.0.0` claims support for
       versions that cannot work.
-- [ ] Configure the subdomain.
+- [ ] Configure the subdomain. **Deferred past launch by Mike, 2026-09-04** —
+      week 1 goes out on the Netlify origin, and whether a custom domain
+      happens at all is a later call.
+
+      It carries a debt if it does happen. `LoginView` builds the reset link
+      from `window.location.origin`, so a mid-season domain change silently
+      moves the origin members arrive from — and until the new one is
+      allowlisted in Supabase, **every password reset dead-ends**, for
+      everybody, with nothing in the app to indicate why. So the domain and the
+      allowlist below are one job, not two, whenever it is done. Allowlist the
+      new origin before pointing anyone at it, and keep the Netlify origin
+      listed as well for anyone holding an older link.
+
 - [ ] Allowlist `/auth/callback` in Supabase → Authentication → URL
-      Configuration. No app change substitutes for this; password reset
-      dead-ends without it.
+      Configuration — on the Netlify origin, per the decision above. No app
+      change substitutes for this; password reset dead-ends without it. Verify
+      end to end against the deployed site rather than assuming, since the
+      failure is invisible until a member needs it.
 
 ## Application
 

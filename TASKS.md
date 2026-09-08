@@ -154,6 +154,16 @@ Read `PLANNING.md` for why things are shaped the way they are.
       are one `saveButton` helper rather than two copies — they must never
       disagree about whether the sheet is saveable. Checked by rendering
       `PicksView` against fake games, since there is still no `.env.local`.
+- [x] Issue #19: unselecting a pick could not be saved. The **Save picks**
+      button tested the draft for EMPTINESS (`complete.length === 0`) rather
+      than for change, so removing a member's last unlocked pick greyed the
+      button out and stranded the deletion on the client. It is now driven by
+      `sheetHasChanges` in `src/lib/sheet.ts`, which compares the sheet that
+      would be sent against the stored unlocked picks. `save_picks` needed no
+      change — it already replaces every unlocked row with what it is sent, so
+      an omitted pick is a deletion and an empty sheet is a valid clear. Side
+      effect worth knowing: the button now also goes grey when nothing has
+      changed, where it used to sit live and re-save identical rows.
 - [ ] **Run the other six screens against a real Supabase.** Same gap `/picks`
       had: they typecheck, build and pass their unit tests, but nothing local
       has loaded a row into them — there is still no `.env.local` in the repo.

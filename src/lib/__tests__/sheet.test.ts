@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeSheet } from '../sheet';
+import { sheetHasChanges, summarizeSheet } from '../sheet';
 import { BONUS_POINTS, ORDINARY_POINTS } from '../../constants';
 import { getFinalLockAt } from '../timezone';
 import type { Game, Pick } from '../../types';
@@ -172,5 +172,78 @@ describe('summarizeSheet', () => {
 
     const summary = summarizeSheet(WEEK, games, picks, new Date('2026-09-11T12:00:00Z'));
     expect(summary.remaining).toBe(0);
+  });
+});
+
+/**
+ * Whether the save button has anything to send.
+ *
+ * The case that earned this function is the LAST one below: a member who
+ * unselects their only unlocked pick is making a real edit, and the sheet used
+ * to refuse to send it because the draft was empty. Emptiness and unchanged are
+ * not the same state, and the whole point of the function is to stop the screen
+ * confusing them.
+ */
+describe('sheetHasChanges', () => {
+  const stored = (gameId: string, teamId = 'PHI', confidence = ORDINARY_POINTS): Pick => ({
+    ...pick(gameId, confidence),
+    selectedTeamId: teamId
+  });
+
+  const sent = (gameId: string, teamId = 'PHI', confidence = ORDINARY_POINTS) => ({
+    gameId,
+    selectedTeamId: teamId,
+    confidence
+  });
+
+  it('is false when a freshly loaded sheet has not been touched', () => {
+    const saved = [stored('a'), stored('b', 'DAL', BONUS_POINTS)];
+    expect(sheetHasChanges(saved, [sent('a'), sent('b', 'DAL', BONUS_POINTS)])).toBe(false);
+  });
+
+  it('ignores the order picks arrive in', () => {
+    const saved = [stored('a'), stored('b', 'DAL')];
+    expect(sheetHasChanges(saved, [sent('b', 'DAL'), sent('a')])).toBe(false);
+  });
+
+  it('is false for an untouched empty sheet, so a no-op save is never offered', () => {
+    expect(sheetHasChanges([], [])).toBe(false);
+  });
+
+  it('sees a pick added to an empty sheet', () => {
+    expect(sheetHasChanges([], [sent('a')])).toBe(true);
+  });
+
+  it('sees the other side of the same game picked', () => {
+    expect(sheetHasChanges([stored('a', 'PHI')], [sent('a', 'DAL')])).toBe(true);
+  });
+
+  it('sees a point value changed', () => {
+    expect(
+      sheetHasChanges([stored('a', 'PHI', ORDINARY_POINTS)], [sent('a', 'PHI', BONUS_POINTS)])
+    ).toBe(true);
+  });
+
+  it('sees the bonus moved to another game', () => {
+    const saved = [stored('a', 'PHI', BONUS_POINTS), stored('b', 'DAL', ORDINARY_POINTS)];
+    const draft = [sent('a', 'PHI', ORDINARY_POINTS), sent('b', 'DAL', BONUS_POINTS)];
+    expect(sheetHasChanges(saved, draft)).toBe(true);
+  });
+
+  it('sees one pick removed from a full sheet', () => {
+    const saved = ['a', 'b', 'c', 'd'].map(id => stored(id));
+    expect(sheetHasChanges(saved, [sent('a'), sent('b'), sent('c')])).toBe(true);
+  });
+
+  it('sees one pick swapped for another, though the count is unchanged', () => {
+    // Equal lengths are not equal sheets. Comparing counts alone would call
+    // this unchanged and grey the button out over a real edit.
+    expect(sheetHasChanges([stored('a')], [sent('b')])).toBe(true);
+  });
+
+  it('sees the last pick unselected — issue #19', () => {
+    // The draft is empty, but the stored sheet is not, so there IS something to
+    // save: save_picks deletes every unlocked row it is not sent.
+    expect(sheetHasChanges([stored('a')], [])).toBe(true);
   });
 });

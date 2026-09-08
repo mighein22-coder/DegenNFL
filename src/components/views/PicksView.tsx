@@ -9,6 +9,7 @@ import {
   ORDINARY_PICKS_PER_WEEK
 } from '../../constants';
 import { isPickLocked, getFinalLockAt, getTimeUntil } from '../../lib/timezone';
+import { sheetHasChanges } from '../../lib/sheet';
 import type { Game, Pick, Week } from '../../types';
 import type { PickSubmission } from '../../lib/supabaseService';
 
@@ -30,6 +31,11 @@ import type { PickSubmission } from '../../lib/supabaseService';
  *     same is true of the four 1s once all four are locked.
  *   * A partial sheet is therefore a normal state, not an error. The save RPC
  *     accepts it; only the unlocked rows are replaced.
+ *   * An EMPTY sheet is a normal state too. save_picks replaces every unlocked
+ *     row with what it is sent, so a pick left out is a pick deleted, and a
+ *     member who unselects everything is asking for exactly that. The save
+ *     button therefore turns on when the sheet has CHANGED, not when it holds
+ *     something — see `sheetHasChanges`.
  *
  * The consequence for this component: what is still assignable is derived from
  * locked picks plus current draft selections TOGETHER, never from the draft
@@ -77,6 +83,14 @@ export const PicksView: React.FC<PicksViewProps> = ({
 
   const lockedPicks = useMemo(
     () => myPicks.filter(p => lockedByGameId.get(p.gameId)),
+    [myPicks, lockedByGameId]
+  );
+
+  // What the draft is measured against when deciding whether there is anything
+  // to save: the stored picks the draft can still change. Locked ones are never
+  // submitted, so including them here would read as a change that never clears.
+  const savedOpenPicks = useMemo(
+    () => myPicks.filter(p => !lockedByGameId.get(p.gameId)),
     [myPicks, lockedByGameId]
   );
 
@@ -173,16 +187,20 @@ export const PicksView: React.FC<PicksViewProps> = ({
   const complete = draftEntries.filter(([, d]) => d.confidence != null);
   const totalPicked = lockedPicks.length + complete.length;
 
+  // The sheet as it would be sent. Only the unlocked picks are here: save_picks
+  // preserves the locked ones, so omitting them is correct rather than a
+  // deletion. An UNLOCKED pick left out, by contrast, IS a deletion — which is
+  // what makes an empty submission meaningful and worth offering.
+  const submission: PickSubmission[] = complete.map(([gameId, d]) => ({
+    gameId,
+    selectedTeamId: d.selectedTeamId,
+    confidence: d.confidence!
+  }));
+
+  const dirty = sheetHasChanges(savedOpenPicks, submission);
+
   const handleSave = () => {
-    // Only the unlocked picks are sent. save_picks preserves the locked ones,
-    // so omitting them is correct rather than a deletion.
-    onSave(
-      complete.map(([gameId, d]) => ({
-        gameId,
-        selectedTeamId: d.selectedTeamId,
-        confidence: d.confidence!
-      }))
-    );
+    onSave(submission);
   };
 
   const finalLock = getFinalLockAt(week.weekNumber);
@@ -193,12 +211,17 @@ export const PicksView: React.FC<PicksViewProps> = ({
   // the sheet, so a long week is never a scroll away from saving. Built here
   // rather than written out twice: the two must never disagree about whether
   // the sheet is saveable, or one of them lies about it.
+  //
+  // Live when the sheet has CHANGED, not when it merely holds a pick. The
+  // earlier emptiness test made removing a member's last unlocked pick
+  // impossible: unselecting it emptied the draft and greyed the button out
+  // with the deletion stranded on the client.
   const saveButton = (size: 'md' | 'lg', className: string) => (
     <Button
       size={size}
       className={className}
       isLoading={saving}
-      disabled={complete.length === 0}
+      disabled={!dirty}
       onClick={handleSave}
     >
       Save picks

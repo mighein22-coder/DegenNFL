@@ -123,3 +123,52 @@ function deriveStatus(
   if (picked >= PICKS_PER_WEEK) return 'COMPLETE';
   return picked === 0 ? 'EMPTY' : 'PARTIAL';
 }
+
+/**
+ * A pick as the client submits it: the three fields `save_picks` reads. Named
+ * here rather than imported from `supabaseService` so this file stays free of
+ * the Supabase client — it is structurally the same as `PickSubmission`.
+ */
+export interface SubmittedPick {
+  gameId: string;
+  selectedTeamId: string;
+  confidence: number;
+}
+
+/**
+ * Whether a draft sheet differs from what is stored — i.e. whether there is
+ * anything to save.
+ *
+ * The pick sheet used to offer its save button whenever the draft held at least
+ * one complete pick, which is a test of EMPTINESS rather than of change. That
+ * made the one edit a member could not perform the removal of their last
+ * unlocked pick: unselecting it emptied the draft, the button greyed out, and
+ * the deletion had nowhere to go. `save_picks` reads an omitted pick as a
+ * deletion and accepts an empty sheet, so the removal was always valid — the
+ * screen just would not send it.
+ *
+ * @param savedOpenPicks The member's stored picks whose games are still OPEN,
+ *                       and only those. Locked picks are not the draft's to
+ *                       change and are never submitted, so counting them here
+ *                       would report an unchanged sheet as dirty forever.
+ * @param submission     The picks the sheet would send: complete ones only.
+ *
+ * Game ids are unique on both sides — the draft is keyed by game and the
+ * database holds one pick per game per member — so equal lengths plus every
+ * submitted pick matching a stored one means the two sets are equal.
+ */
+export function sheetHasChanges(
+  savedOpenPicks: Pick[],
+  submission: SubmittedPick[]
+): boolean {
+  if (submission.length !== savedOpenPicks.length) return true;
+
+  return submission.some(sent => {
+    const saved = savedOpenPicks.find(p => p.gameId === sent.gameId);
+    return (
+      !saved ||
+      saved.selectedTeamId !== sent.selectedTeamId ||
+      saved.confidence !== sent.confidence
+    );
+  });
+}

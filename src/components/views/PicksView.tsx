@@ -49,7 +49,15 @@ import type { PickSubmission } from '../../lib/supabaseService';
 interface PicksViewProps {
   week: Week;
   games: Game[];
-  /** The signed-in member's existing picks for this week. */
+  /**
+   * The signed-in member's existing picks for this week, and ONLY theirs.
+   *
+   * Everything below reads this as "mine": the locked-in count, which point
+   * values are still spendable, and which team a locked card draws. Passing a
+   * league-wide read here does not degrade gracefully — it inflates the count
+   * past five, hides values another member spent, and shows their pick as
+   * yours. `getMyPicksForWeek` takes a user id for this reason.
+   */
   myPicks: Pick[];
   saving?: boolean;
   onSave: (picks: PickSubmission[]) => void;
@@ -237,6 +245,11 @@ export const PicksView: React.FC<PicksViewProps> = ({
           </h1>
           <p className="mt-2 text-muted">
             {totalPicked} of {PICKS_PER_WEEK} picked
+            {/* This count includes selections that are only on screen, so on
+                its own it cannot be read as "my sheet is in". Saying so is the
+                difference between a member who knows their save was rejected
+                and one who reads 5 of 5 over an empty row in the Matrix. */}
+            {dirty && <span className="text-loss"> · not saved yet</span>}
             {' · '}
             {spent.bonus > 0 ? 'bonus set' : 'bonus not set'}
             {' · '}

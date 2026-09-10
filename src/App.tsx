@@ -144,7 +144,7 @@ const App: React.FC = () => {
               membership, so every screen below can take it as a given rather
               than each re-deriving who is signed in. */}
           <Route path="/" element={<DashboardView profile={profile} />} />
-          <Route path="/picks" element={<PicksPage />} />
+          <Route path="/picks" element={<PicksPage profile={profile} />} />
           <Route path="/matrix" element={<ResultsView profile={profile} />} />
           <Route path="/affinity" element={<TeamStatsView profile={profile} />} />
           <Route path="/standings" element={<StandingsView profile={profile} />} />

@@ -345,11 +345,31 @@ export async function setSpread(gameId: string, rawSpread: number): Promise<Game
 // Picks
 // ---------------------------------------------------------------------------
 
-export async function getPicksForWeek(weekId: string): Promise<Pick[]> {
-  const { data, error } = await supabase.from('picks').select('*').eq('week_id', weekId);
+/**
+ * One member's picks for one week.
+ *
+ * The user filter is NOT redundant with RLS, and this function used to be
+ * called `getPicksForWeek` with the filter left out on the grounds that it was.
+ * `picks_select_visible` hides other members' UNLOCKED picks and deliberately
+ * REVEALS their locked ones — `pick_revealed` is defined as exactly
+ * `pick_locked` (0001_init.sql). So from the first kickoff of a week onward, an
+ * unfiltered read returns everybody's picks on every game that has started, and
+ * a caller that treats the result as "mine" reports the league's sheet as the
+ * member's own: the pick sheet counted 8 of 5 on the 2026 opener, offered a
+ * bonus another member had already spent, and drew somebody else's team on a
+ * locked card.
+ *
+ * The name now says whose picks these are, so the filter cannot be dropped as
+ * an optimisation a second time. For the league-wide read, use `getAllPicks`.
+ */
+export async function getMyPicksForWeek(weekId: string, userId: string): Promise<Pick[]> {
+  const { data, error } = await supabase
+    .from('picks')
+    .select('*')
+    .eq('week_id', weekId)
+    .eq('user_id', userId);
+
   if (error) throw error;
-  // RLS already hides other members' unlocked picks — see 0001_init.sql. What
-  // comes back here is exactly what the caller is allowed to see.
   return (data as PickRow[]).map(toPick);
 }
 

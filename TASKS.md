@@ -164,6 +164,23 @@ Read `PLANNING.md` for why things are shaped the way they are.
       an omitted pick is a deletion and an empty sheet is a valid clear. Side
       effect worth knowing: the button now also goes grey when nothing has
       changed, where it used to sit live and re-save identical rows.
+- [x] The pick sheet counted the whole league as one member. `getPicksForWeek`
+      read every pick for the week with no user filter, on the grounds that RLS
+      made it safe. It does not: `picks_select_visible` hides other members'
+      UNLOCKED picks and deliberately REVEALS their locked ones, so from the
+      first kickoff of a week onward that read returns everybody. `PicksPage`
+      passed it to `PicksView` as `myPicks` — the one screen that did not filter
+      by user id, where `DashboardView` and `MyHistoryView` both do. It surfaced
+      on the 2026 opener (Wed 9 Sep, 20:20 ET) as "8 of 5 picked", another
+      member's team drawn on a locked card, and — worst — a point selector that
+      counted other members' spent 1s and 3s and so offered a member nothing to
+      assign. Now `getMyPicksForWeek(weekId, userId)`, with the user id in the
+      signature so the filter cannot be dropped as an optimisation again, and
+      `PicksPage` takes `profile` like every other view.
+- [x] The pick sheet's "N of 5 picked" counted the DRAFT, so a save the database
+      had rejected still read as a full sheet while the Matrix showed the row
+      empty. It now says "not saved yet" whenever the sheet differs from what is
+      stored, reusing the `sheetHasChanges` comparison the save button runs on.
 - [ ] **Run the other six screens against a real Supabase.** Same gap `/picks`
       had: they typecheck, build and pass their unit tests, but nothing local
       has loaded a row into them — there is still no `.env.local` in the repo.

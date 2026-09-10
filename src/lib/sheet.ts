@@ -58,9 +58,12 @@ export interface SheetSummary {
 /**
  * @param weekNumber The week being summarised.
  * @param games      Every game in that week.
- * @param myPicks    The signed-in member's picks, and ONLY theirs. `getPicksForWeek`
+ * @param myPicks    The signed-in member's picks, and ONLY theirs. `getAllPicks`
  *                   returns other members' revealed picks too; passing those in
- *                   would report someone else's sheet as the member's own.
+ *                   would report someone else's sheet as the member's own. That
+ *                   is not hypothetical — it happened on the 2026 opener, which
+ *                   is why the per-week read is now `getMyPicksForWeek` and
+ *                   takes the user id.
  */
 export function summarizeSheet(
   weekNumber: number,

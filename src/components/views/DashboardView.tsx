@@ -67,7 +67,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ profile }) => {
   const load = useCallback(async (): Promise<Loaded> => {
     const week = await getCurrentWeek();
     // The season-wide pick read covers this week too, so there is no separate
-    // getPicksForWeek here — one query fewer, and the standings below and the
+    // getMyPicksForWeek here — one query fewer, and the standings below and the
     // sheet above can never disagree about what was picked.
     const [games, allPicks, profiles] = await Promise.all([
       getGamesForWeek(week.id),

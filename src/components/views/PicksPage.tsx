@@ -4,7 +4,7 @@ import { Button } from '../Button';
 import {
   getCurrentWeek,
   getGamesForWeek,
-  getPicksForWeek,
+  getMyPicksForWeek,
   savePicks,
   syncWeek,
   type PickSubmission
@@ -12,6 +12,7 @@ import {
 import { getWeekOpensAt, formatETTime, getTimeUntil } from '../../lib/timezone';
 import { findGamesWithoutLine } from '../../lib/missingLines';
 import type { Game, Pick, Week } from '../../types';
+import type { Profile } from '../../lib/supabase';
 
 /**
  * The pick sheet, wired to data.
@@ -38,13 +39,18 @@ import type { Game, Pick, Week } from '../../types';
  * open a page. It runs AFTER first paint so the sheet is never waiting on ESPN.
  */
 
+interface PicksPageProps {
+  profile: Profile;
+}
+
 interface Loaded {
   week: Week;
   games: Game[];
+  /** This member's picks, and only theirs — see `getMyPicksForWeek`. */
   myPicks: Pick[];
 }
 
-export const PicksPage: React.FC = () => {
+export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -56,10 +62,10 @@ export const PicksPage: React.FC = () => {
     // Games and picks are independent reads; no reason to wait twice.
     const [games, myPicks] = await Promise.all([
       getGamesForWeek(week.id),
-      getPicksForWeek(week.id)
+      getMyPicksForWeek(week.id, profile.id)
     ]);
     return { week, games, myPicks };
-  }, []);
+  }, [profile.id]);
 
   useEffect(() => {
     let cancelled = false;

@@ -147,6 +147,56 @@ describe('computeStandings', () => {
     expect(rows[1]).toMatchObject({ totalPoints: 0, wins: 0, losses: 0, rank: 2 });
   });
 
+  it('orders a week scope by that week alone', () => {
+    const profiles = [profile('a', 'Ann'), profile('b', 'Bob')];
+    const rows = computeStandings(
+      profiles,
+      [
+        ...picks('a', 4, 0, 'week-2026-01'), // a big week 1, nothing since
+        ...picks('b', 1, 0, 'week-2026-01'),
+        ...picks('b', 4, 0, 'week-2026-02')
+      ],
+      { within: { week: 'week-2026-02' } }
+    );
+
+    // Week 2 is Bob's, however far ahead Ann is on the season.
+    expect(rows.map(r => r.name)).toEqual(['Bob', 'Ann']);
+    expect(rows[0]).toMatchObject({ totalPoints: 4, wins: 4, losses: 0, seasonPoints: 5 });
+    // Ann played no week 2, so she is level at zero, not absent.
+    expect(rows[1]).toMatchObject({ totalPoints: 0, wins: 0, losses: 0, seasonPoints: 4 });
+  });
+
+  it('applies the losses tiebreaker inside a week scope too', () => {
+    const profiles = [profile('a', 'Ann'), profile('b', 'Bob')];
+    const rows = computeStandings(
+      profiles,
+      [
+        // Same two points that week, but Bob lost three more getting them —
+        // which under per-game locking is just a fuller sheet than Ann's.
+        ...picks('a', 2, 0, 'week-2026-03'),
+        ...picks('b', 2, 3, 'week-2026-03')
+      ],
+      { within: { week: 'week-2026-03' } }
+    );
+
+    expect(rows.map(r => r.name)).toEqual(['Ann', 'Bob']);
+    expect(rows.map(r => r.rank)).toEqual([1, 2]);
+  });
+
+  it('scopes a week without disturbing the weekly column', () => {
+    // `weekId` names the column; `within` decides the order. They are separate
+    // on purpose, and pointing them at different weeks must not blur them.
+    const [row] = computeStandings(
+      [profile('a', 'Ann')],
+      [...picks('a', 3, 0, 'week-2026-01'), ...picks('a', 1, 0, 'week-2026-02')],
+      { within: { week: 'week-2026-01' }, weekId: 'week-2026-02' }
+    );
+
+    expect(row.totalPoints).toBe(3); // week 1, the scope
+    expect(row.weeklyScore).toBe(1); // week 2, the column
+    expect(row.seasonPoints).toBe(4);
+  });
+
   it('orders a segment scope by that segment, not by the season', () => {
     const profiles = [profile('a', 'Ann'), profile('b', 'Bob')];
     const rows = computeStandings(
@@ -155,7 +205,7 @@ describe('computeStandings', () => {
         ...picks('a', 5, 0, 'week-2026-01'), // segment 1 only
         ...picks('b', 2, 1, 'week-2026-07') // segment 2 only
       ],
-      { segment: 2 }
+      { within: { segment: 2 } }
     );
 
     expect(rows.map(r => r.name)).toEqual(['Bob', 'Ann']);

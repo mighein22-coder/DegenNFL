@@ -49,7 +49,12 @@ export const StandingsView: React.FC<StandingsViewProps> = ({ profile }) => {
   const segments = useMemo(() => getSegments(), []);
 
   const rows = useMemo(
-    () => (data ? computeStandings(data.profiles, data.picks, { segment }) : []),
+    () =>
+      data
+        ? computeStandings(data.profiles, data.picks, {
+            within: segment == null ? null : { segment }
+          })
+        : [],
     [data, segment]
   );
 

@@ -16,13 +16,21 @@ export interface StandingsScope {
    * Week whose points populate `weeklyScore`. When omitted, falls back to the
    * most recent week that has any resolved picks, so the column is meaningful
    * before the current week has been scored.
+   *
+   * This names the COLUMN only and filters nothing — `within` below is what
+   * decides who is ahead of whom.
    */
   weekId?: string;
   /**
-   * Restrict wins, losses, points and rank to a single segment. Omit or pass
-   * null for the cumulative season table.
+   * What counts toward points, wins, losses and rank: the whole season (omit
+   * or pass null), one segment, or one week.
+   *
+   * One field rather than two nullable ones because the three are exclusive —
+   * a table scoped to both a segment and a week is not a thing, and a shape
+   * that cannot express it needs no rule saying so. The Matrix's scope pills
+   * (issue #27) are this union, one pill each.
    */
-  segment?: number | null;
+  within?: { segment: number } | { week: string } | null;
 }
 
 /**
@@ -50,11 +58,18 @@ export function mostRecentScoredWeekId(picks: Pick[]): string | undefined {
  * switch scope without a round-trip. At pool scale (~20 members, 18 weeks, 5
  * picks each) that is a couple of thousand rows.
  *
- * Scoping is per segment and total: when a segment is selected, points, wins,
- * losses and rank all count only that segment's weeks. `seasonPoints` stays
+ * Scope is season, one segment, or one week: whichever is chosen, points,
+ * wins, losses and rank count only picks inside it. `seasonPoints` stays
  * cumulative in every scope so a member's overall position is never hidden.
  *
- * Members with no picks in the selected segment still appear, at zero — they
+ * A WEEK SCOPE IS ONLY EVER AS COMPLETE AS WHAT THE READER MAY SEE. Unrevealed
+ * picks are not in `picks` at all — `picks_select_visible` drops them before
+ * they reach the client — so ordering by a week in progress ranks members
+ * partly by how much of their sheet has kicked off. That is honest for a
+ * result table filling in live, and it is why the Matrix (issue #27) labels
+ * this scope by the week rather than presenting it as a standing.
+ *
+ * Members with no picks in the selected scope still appear, at zero — they
  * are behind, not absent.
  */
 export function computeStandings(
@@ -62,7 +77,7 @@ export function computeStandings(
   picks: Pick[],
   scope: StandingsScope = {}
 ): StandingsRow[] {
-  const { segment = null } = scope;
+  const { within = null } = scope;
   const segments: Segment[] = getSegments();
   const weekId = scope.weekId ?? mostRecentScoredWeekId(picks);
 
@@ -82,10 +97,15 @@ export function computeStandings(
     else picksByUser.set(pick.userId, [pick]);
   }
 
+  const inScope = (pick: Pick): boolean => {
+    if (within == null) return true;
+    if ('week' in within) return pick.weekId === within.week;
+    return segmentOf(pick.weekId) === within.segment;
+  };
+
   const rows = profiles.map(profile => {
     const userPicks = picksByUser.get(profile.id) ?? [];
-    const scoped =
-      segment == null ? userPicks : userPicks.filter(p => segmentOf(p.weekId) === segment);
+    const scoped = within == null ? userPicks : userPicks.filter(inScope);
 
     return {
       userId: profile.id,

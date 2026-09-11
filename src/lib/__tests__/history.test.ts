@@ -155,7 +155,9 @@ describe('buildHistory', () => {
     const history = buildHistory(picks, games);
 
     for (const entry of history) {
-      const [row] = computeStandings(profiles, picks, { segment: entry.segment.number });
+      const [row] = computeStandings(profiles, picks, {
+        within: { segment: entry.segment.number }
+      });
       expect(row.totalPoints).toBe(entry.points);
       expect(row.wins).toBe(entry.wins);
       expect(row.losses).toBe(entry.losses);

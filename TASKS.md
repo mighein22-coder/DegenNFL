@@ -328,9 +328,40 @@ Read `PLANNING.md` for why things are shaped the way they are.
       was pinning that (`src/lib/__tests__/standings.test.ts`) and saying so in
       both files, so nobody later "fixes" the Dashboard by sorting it locally.
 
-      The Matrix orders by the **season** table, not the week being shown: a
-      per-week order would reshuffle every row each time the week selector
-      moved.
+      The Matrix shipped ordering by the **season** table. Issue #27 replaced
+      that with a pill selector the same day — see below.
+
+- [x] **Scope pills on the Matrix** (issue #27). `Order by: Week n / Segment n
+      / Season`, beside the Print button. The sort rule does not change — it is
+      still `computeStandings` — only the slice of the season it is computed
+      over.
+
+      **The default is Week**, which also fixes something #22 got wrong. The
+      grid's own Pts column is a *week* total, so a season-ordered grid shows
+      its one number column looking unsorted, which reads as a broken table.
+      Opening on Week means the order and the visible column agree, and the two
+      wider scopes are a deliberate step back from the sheets on screen.
+
+      `computeStandings` could not do this. Its `weekId` names the week that
+      fills the `weeklyScore` COLUMN and filters nothing; only `segment`
+      filtered. The two loose fields are now `weekId` plus
+      `within: {segment} | {week} | null` — one field, because the three
+      scopes are exclusive and a shape that cannot express "segment 2 AND week
+      9" needs no rule forbidding it.
+
+      **A week scope is only as complete as what the reader may see.**
+      `picks_select_visible` drops unrevealed picks before they reach the
+      client, so on a week nothing has kicked off in, every member is 0/0/0 and
+      the order falls through to the name; mid-week it partly ranks people by
+      how much of their sheet has been revealed. That is a result table filling
+      in live rather than a bug, and it is why the pill says "Week 9" and not
+      "Standing".
+
+      The subtitle is gone, at Mike's call, to make room. It was the only thing
+      telling PAPER which week a printed grid covered (the week selector is
+      `print:hidden`), so a print-only caption above the table now carries both
+      the week and the scope — two printed matrices would otherwise be
+      indistinguishable.
 
 ---
 

@@ -138,7 +138,9 @@ const App: React.FC = () => {
     <div className="flex min-h-screen">
       <Sidebar profile={profile} onSignOut={signOut} />
 
-      <main className="flex-1 p-4 pb-20 md:p-8 md:pb-8">
+      {/* pb-20 clears the mobile bottom nav, which does not exist on paper —
+          without print:p-0 every printed page carries an inch of it. */}
+      <main className="flex-1 p-4 pb-20 md:p-8 md:pb-8 print:p-0">
         <Routes>
           {/* Past the guard above, `profile` is non-null — and a profile IS
               membership, so every screen below can take it as a given rather

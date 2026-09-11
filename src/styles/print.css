@@ -1,0 +1,81 @@
+/* ==========================================================================
+ * print.css — what the app looks like on paper
+ *
+ * NOT shared with FrozenDegenerates, because tokens.shared.css must stay
+ * byte-identical between the two repos and this file redefines slots declared
+ * there. It is written to be liftable anyway: nothing below names a sport, and
+ * the brand ramp is only nudged, never replaced.
+ *
+ * THE PROBLEM THIS SOLVES. The app is dark: --text-primary is oklch(0.97),
+ * near-white. Browsers print text colours exactly as specified but drop
+ * background-color unless the member ticks "Background graphics" — so printing
+ * the app as-is gives a blank sheet with faint grey smudges on it. Every
+ * surface and text token is therefore inverted below.
+ *
+ * Because Tailwind v4 compiles `bg-surface` to `var(--color-surface)` rather
+ * than to a literal, redefining the raw tokens here flips EVERY screen, not
+ * just the two with a print button on them.
+ *
+ * What is deliberately NOT done: forcing backgrounds with
+ * `print-color-adjust: exact`. A picked game is marked `bg-brand-900/40`, and
+ * forcing that would print a dark green block under dark text. The picked side
+ * carries a printed tick instead — see GameCard.
+ * ========================================================================== */
+
+@media print {
+  :root {
+    /* Surfaces all collapse to the paper. The three-level depth the screen
+       uses (canvas / base / sunken) carries no meaning once nothing is
+       painted; the borders do the separating. */
+    --surface-canvas: white;
+    --surface-base: white;
+    --surface-raised: white;
+    --surface-sunken: white;
+    --surface-line: oklch(0.72 0 0);
+
+    --text-primary: oklch(0.18 0 0);
+    --text-muted: oklch(0.42 0 0);
+    --text-faint: oklch(0.56 0 0);
+
+    /* The brand ramp is used at both ends and they need opposite treatment:
+       the dark end (800/900) is only ever a background, so it goes light in
+       case backgrounds are printed after all; the light end (400/500) is a
+       border or a rule on white and has to darken to stay visible. */
+    --brand-900: oklch(0.95 0.03 155);
+    --brand-800: oklch(0.93 0.04 155);
+    --brand-500: oklch(0.47 0.13 155);
+    --brand-400: oklch(0.5 0.14 155);
+
+    /* Declared in tokens.shared.css as literals rather than through a slot,
+       so they are overridden by name. Both are mid-lightness for a dark
+       screen and too pale to read on white. */
+    --color-win: oklch(0.45 0.16 150);
+    --color-loss: oklch(0.44 0.2 25);
+    --color-pending: oklch(0.5 0 0);
+
+    --shadow-card: none;
+    --shadow-glow: none;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+
+  /* The League Matrix is a member-by-game grid up to sixteen columns wide and
+     does not fit portrait. Named pages are the only way to ask for landscape
+     on one screen and not the other; a browser that does not support them
+     prints portrait, which clips rather than fails. */
+  @page matrix {
+    size: landscape;
+  }
+
+  .print-landscape {
+    page: matrix;
+  }
+
+  /* Nothing on paper is going to be clicked, and a focus ring or a hover
+     transition mid-print is noise. */
+  * {
+    transition: none !important;
+  }
+}

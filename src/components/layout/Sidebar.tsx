@@ -24,8 +24,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, onSignOut }) => {
 
   return (
     <>
-      {/* Desktop */}
-      <nav className="hidden w-56 shrink-0 flex-col border-r border-line bg-surface-sunken p-4 md:flex">
+      {/* Desktop. `print:!hidden` carries the important marker deliberately:
+          a printed page is wider than the md breakpoint, so `md:flex` is live
+          at print time and the two variants would otherwise be a coin toss. */}
+      <nav className="hidden w-56 shrink-0 flex-col border-r border-line bg-surface-sunken p-4 md:flex print:!hidden">
         <div className="mb-6 px-3">
           <span className="font-display text-2xl tracking-wide text-brand-400">
             DegenNFL
@@ -57,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, onSignOut }) => {
       </nav>
 
       {/* Mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-10 flex justify-around border-t border-line bg-surface-sunken md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-10 flex justify-around border-t border-line bg-surface-sunken md:hidden print:hidden">
         {routes.map(route => (
           <NavLink
             key={route.path}

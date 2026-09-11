@@ -23,6 +23,9 @@ import type { Game } from '../types';
  *      and the RLS policy both reject a pick on it, so offering the choice
  *      would only produce an error at submit time. That is derived here from
  *      the game itself rather than passed in, so no call site can forget it.
+ *
+ * The card never splits across a page break. A game whose away team is at the
+ * foot of one sheet and whose line is on the next is not a record of anything.
  */
 
 interface GameCardProps {
@@ -61,18 +64,40 @@ export const GameCard: React.FC<GameCardProps> = ({
         onClick={() => onSelectTeam?.(teamId)}
         className={[
           'flex flex-1 items-center gap-3 rounded-control border p-3 text-left transition-colors',
+          // `print-picked` is the only thing in the app that forces a
+          // background onto paper — see the rule in print.css for why this
+          // one earns it. On screen the class does nothing.
           picked
-            ? 'border-brand-400 bg-brand-900/40'
+            ? 'border-brand-400 bg-brand-900/40 print-picked'
             : 'border-line bg-surface hover:bg-surface-raised',
-          locked || awaitingLine ? 'cursor-default opacity-70' : 'cursor-pointer'
+          // The fade says "you cannot click this". On paper nothing is
+          // clickable and the fade only makes a locked pick — the part of the
+          // sheet that is actually final — the faintest thing on the page.
+          locked || awaitingLine
+            ? 'cursor-default opacity-70 print:opacity-100'
+            : 'cursor-pointer'
         ].join(' ')}
       >
         <span
           aria-hidden
-          className="h-8 w-1.5 shrink-0 rounded-full"
+          className="h-8 w-1.5 shrink-0 rounded-full print:hidden"
           // The club's own colour, not a design token — see constants.ts.
           style={{ backgroundColor: team?.logoColor ?? 'transparent' }}
         />
+
+        {/* The tick is the second carrier of the same fact the fill carries.
+            Both, deliberately: the fill is the one a low-toner printer or a
+            photocopy eats, and the tick is the one that survives it. It stands
+            where the colour bar does so the rows stay aligned. */}
+        <span
+          aria-hidden
+          className={[
+            'hidden w-1.5 shrink-0 text-center font-display text-lg leading-none print:block',
+            picked ? '' : 'invisible'
+          ].join(' ')}
+        >
+          &#10003;
+        </span>
         <span className="min-w-0">
           <span className="block truncate font-display text-lg leading-none">
             {team?.city ?? teamId}
@@ -87,7 +112,7 @@ export const GameCard: React.FC<GameCardProps> = ({
   };
 
   return (
-    <article className="rounded-card border border-line bg-surface-sunken p-4">
+    <article className="break-inside-avoid rounded-card border border-line bg-surface-sunken p-4">
       <header className="mb-3 flex items-center justify-between text-sm text-muted">
         <span>
           {formatETTime(kickoff, 'EEE h:mm a zzz')}

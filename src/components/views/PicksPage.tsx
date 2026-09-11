@@ -165,7 +165,7 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
   return (
     <>
       {withoutLine.length > 0 && (
-        <div className="mx-auto mb-4 max-w-3xl rounded-card border border-line bg-surface-sunken p-4 text-sm">
+        <div className="mx-auto mb-4 max-w-3xl break-inside-avoid rounded-card border border-line bg-surface-sunken p-4 text-sm print:max-w-none">
           <p className="text-ink">
             {withoutLine.length === 1
               ? 'One game has no line yet and cannot be picked:'
@@ -192,6 +192,11 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
         </div>
       )}
 
+      {/* A failed save is a fact about the sheet being printed, not a
+          transient toast — it stays on the record, because a member holding a
+          printed sheet the pool rejected needs to be holding the rejection
+          too. `dirty` in PicksView prints the same warning from the other
+          direction; either one alone leaves a gap. */}
       {saveError && (
         <div className="mx-auto mb-4 max-w-3xl rounded-card border border-loss bg-surface-sunken p-4 text-sm text-ink">
           {saveError}
@@ -208,6 +213,7 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
         week={week}
         games={games}
         myPicks={myPicks}
+        memberName={profile.name}
         saving={saving}
         onSave={handleSave}
       />

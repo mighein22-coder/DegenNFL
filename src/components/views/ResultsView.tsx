@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { EmptyNote, ErrorNote, LoadingNote, PageHeader } from '../Page';
 import { MemberAvatar } from '../MemberAvatar';
 import { PickChip } from '../PickChip';
+import { PrintButton } from '../PrintButton';
 import { useLoader } from '../../hooks/useLoader';
 import { useNow } from '../../hooks/useNow';
 import {
@@ -40,6 +41,16 @@ import type { Game, Pick, Week } from '../../types';
  * week selector filters in memory, so flicking between weeks costs nothing;
  * `getGamesForWeeks` makes the games a single `.in()` rather than a request per
  * week.
+ *
+ * ON PAPER it is the grid, always — the mobile card list is explicitly printed
+ * out of existence rather than left to the md breakpoint, which a printed page
+ * is wide enough to satisfy on some engines and not others. Three screen
+ * devices have to be undone for it to survive: the horizontal scroller (a
+ * printer cannot scroll, and a table inside `overflow` prints only the visible
+ * slice and will not repeat its header across pages), the sticky name column
+ * (position: sticky prints misplaced or doubled), and the portrait page —
+ * sixteen game columns need landscape, requested by the named page in
+ * print.css.
  */
 
 interface ResultsViewProps {
@@ -168,7 +179,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
   const hiddenColumns = games.filter(game => !isGameLocked(game.startTime, now)).length;
 
   return (
-    <section className="mx-auto max-w-6xl">
+    <section className="print-landscape mx-auto max-w-6xl print:max-w-none">
       <PageHeader
         title="League Matrix"
         subtitle={
@@ -178,35 +189,41 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
           </>
         }
         actions={
-          <label className="flex items-center gap-2 text-sm text-muted">
-            Week
-            <select
-              value={week.id}
-              onChange={event => setSelectedWeekId(event.target.value)}
-              className="rounded-control border border-line bg-surface px-2 py-1.5 text-ink"
-            >
-              {[...playedWeeks]
-                .sort((a, b) => b.weekNumber - a.weekNumber)
-                .map(option => (
-                  <option key={option.id} value={option.id}>
-                    Week {option.weekNumber}
-                  </option>
-                ))}
-            </select>
-          </label>
+          <>
+            <PrintButton label="Print matrix" />
+            {/* Which week this is comes from the subtitle on paper, so the
+                control that changes it is not worth the ink. */}
+            <label className="flex items-center gap-2 text-sm text-muted print:hidden">
+              Week
+              <select
+                value={week.id}
+                onChange={event => setSelectedWeekId(event.target.value)}
+                className="rounded-control border border-line bg-surface px-2 py-1.5 text-ink"
+              >
+                {[...playedWeeks]
+                  .sort((a, b) => b.weekNumber - a.weekNumber)
+                  .map(option => (
+                    <option key={option.id} value={option.id}>
+                      Week {option.weekNumber}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </>
         }
       />
 
-      {/* Desktop: the grid. */}
-      <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
-        <table className="w-full text-sm">
+      {/* Desktop, and paper. `print:!block` and `print:overflow-visible` are
+          both load-bearing — see the note at the top of the file. */}
+      <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block print:!block print:overflow-visible print:rounded-none">
+        <table className="w-full text-sm print:text-[9px]">
           <thead>
             <tr className="text-left text-xs text-faint">
-              <th scope="col" className="sticky left-0 z-10 bg-surface px-3 py-2 font-normal">
+              <th scope="col" className="sticky left-0 z-10 bg-surface px-3 py-2 font-normal print:static print:px-1">
                 Member
               </th>
               {games.map(game => (
-                <th key={game.id} scope="col" className="px-2 py-2 font-normal">
+                <th key={game.id} scope="col" className="px-2 py-2 font-normal print:px-1">
                   <GameColumnHeader game={game} now={now} />
                 </th>
               ))}
@@ -222,7 +239,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
                 <tr
                   key={member.id}
                   className={[
-                    'border-t border-line',
+                    'break-inside-avoid border-t border-line',
                     member.id === profile.id ? 'bg-brand-900/30' : ''
                   ].join(' ')}
                 >
@@ -234,7 +251,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
                   <th
                     scope="row"
                     className={[
-                      'sticky left-0 z-10 bg-surface px-3 py-2 text-left font-normal',
+                      'sticky left-0 z-10 bg-surface px-3 py-2 text-left font-normal print:static print:px-1',
                       member.id === profile.id ? 'border-l-2 border-l-brand-400' : ''
                     ].join(' ')}
                   >
@@ -247,7 +264,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
                   {games.map(game => {
                     const pick = byGame?.get(game.id);
                     return (
-                      <td key={game.id} className="px-2 py-2 align-middle">
+                      <td key={game.id} className="px-2 py-2 align-middle print:px-1">
                         {pick ? (
                           <PickChip
                             pick={pick}
@@ -273,8 +290,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
         </table>
       </div>
 
-      {/* Mobile: the grid does not fit, so it becomes a card per member. */}
-      <div className="space-y-3 md:hidden">
+      {/* Mobile: the grid does not fit, so it becomes a card per member. Never
+          on paper — the grid is the whole point of this screen, and printing
+          both would double every sheet. */}
+      <div className="space-y-3 md:hidden print:!hidden">
         {members.map(member => {
           const byGame = picksByUser.get(member.id);
           const made = games.map(game => byGame?.get(game.id)).filter(Boolean) as Pick[];

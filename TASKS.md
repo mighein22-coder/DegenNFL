@@ -306,6 +306,32 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ---
 
+## Done (printing, 2026-09-11)
+
+- [x] **Print buttons on the Matrix and the Picks sheet** (issue #24). Both
+      call `window.print()` — that IS the normal Windows print dialog, and it
+      offers Print to PDF alongside real printers. No library, no dependency.
+
+      The button was the small half. The app is dark (`--text-primary` is
+      oklch 0.97) and browsers drop background-colour when printing, so the app
+      as it stood printed a blank sheet with faint grey smudges on it.
+      `src/styles/print.css` inverts every surface and text token inside
+      `@media print`; because Tailwind v4 compiles `bg-surface` to a `var()`,
+      that one block flips **every** screen, not only the two with a button.
+      It must stay the last import in `index.css` — it wins by source order,
+      not by specificity.
+
+      **The Picks sheet prints as a record of what was submitted**, Mike's
+      call: the whole week including games with no pick on them, the confidence
+      `<select>` printed as its value, the member's name and a timestamp, and a
+      banner when the draft has unsaved changes — paper outlives the tab it
+      came from. Games never split across a page break.
+
+      Not verified: page breaks and the landscape `@page` for the Matrix only
+      exist in a real print preview, and nothing in CI can see them.
+
+---
+
 ## Done (views session, 2026-09-02)
 
 - [x] Six member-facing screens wired to data, replacing their stubs. Each one

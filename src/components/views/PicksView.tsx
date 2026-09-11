@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Button } from '../Button';
 import { GameCard } from '../GameCard';
+import { PrintButton } from '../PrintButton';
 import {
   PICKS_PER_WEEK,
   ORDINARY_POINTS,
@@ -8,7 +9,12 @@ import {
   BONUS_PICKS_PER_WEEK,
   ORDINARY_PICKS_PER_WEEK
 } from '../../constants';
-import { isPickLocked, getFinalLockAt, getTimeUntil } from '../../lib/timezone';
+import {
+  isPickLocked,
+  getFinalLockAt,
+  getTimeUntil,
+  formatETTime
+} from '../../lib/timezone';
 import { sheetHasChanges } from '../../lib/sheet';
 import type { Game, Pick, Week } from '../../types';
 import type { PickSubmission } from '../../lib/supabaseService';
@@ -44,6 +50,20 @@ import type { PickSubmission } from '../../lib/supabaseService';
  * Only the bonus needs the 'move it rather than duplicate it' behaviour below.
  * Ordinary picks are interchangeable, so there is nothing to move — they are
  * only ever capped.
+ *
+ * ON PAPER this screen is a RECORD OF WHAT WAS SUBMITTED, not a blank sheet to
+ * fill in by hand. Three things follow from that and each is a `print:` rule
+ * below rather than a second component:
+ *
+ *   * The WHOLE week prints, open games and locked ones alike, including games
+ *     with no pick on them — a record that silently omits the three games you
+ *     never got to is not a record of your week.
+ *   * Every control becomes the value it holds. The confidence `<select>`
+ *     prints as "3 pts — bonus"; the save buttons do not print at all.
+ *   * An unsaved sheet says so. The draft lives in this component, so a member
+ *     can print five picks the pool has never seen, and paper outlives the tab
+ *     it came from — the banner is the only thing standing between that and a
+ *     dispute in week 14.
  */
 
 interface PicksViewProps {
@@ -59,6 +79,8 @@ interface PicksViewProps {
    * yours. `getMyPicksForWeek` takes a user id for this reason.
    */
   myPicks: Pick[];
+  /** Whose sheet this is. Printed; a sheet on paper with no name on it is anonymous. */
+  memberName: string;
   saving?: boolean;
   onSave: (picks: PickSubmission[]) => void;
 }
@@ -72,6 +94,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
   week,
   games,
   myPicks,
+  memberName,
   saving,
   onSave
 }) => {
@@ -237,12 +260,19 @@ export const PicksView: React.FC<PicksViewProps> = ({
   );
 
   return (
-    <section className="mx-auto max-w-3xl pb-24">
+    <section className="mx-auto max-w-3xl pb-24 print:max-w-none print:pb-0">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-display text-4xl tracking-wide text-ink">
             Week {week.weekNumber}
           </h1>
+
+          {/* Print only. The screen knows whose sheet this is because the
+              member is signed in looking at it; a sheet of paper does not, and
+              these come out of the printer in a stack. */}
+          <p className="mt-1 hidden text-sm text-muted print:block">
+            {memberName} · printed {formatETTime(now, 'EEE d MMM, h:mm a zzz')}
+          </p>
           <p className="mt-2 text-muted">
             {totalPicked} of {PICKS_PER_WEEK} picked
             {/* This count includes selections that are only on screen, so on
@@ -258,8 +288,22 @@ export const PicksView: React.FC<PicksViewProps> = ({
           </p>
         </div>
 
-        {openGames.length > 0 && saveButton('md', 'shrink-0')}
+        <div className="flex shrink-0 items-center gap-2">
+          <PrintButton label="Print sheet" />
+          {openGames.length > 0 && saveButton('md', 'print:hidden')}
+        </div>
       </header>
+
+      {/* The loudest thing on the printed page when it applies, and absent
+          otherwise. `dirty` means the draft on screen differs from what
+          save_picks holds, so this paper would be evidence of a sheet that was
+          never submitted. */}
+      {dirty && (
+        <p className="mb-6 hidden break-inside-avoid border border-loss p-3 text-sm text-loss print:block">
+          These picks have NOT been saved. This is what was on screen when it
+          was printed, not what the pool has recorded.
+        </p>
+      )}
 
       {openGames.length > 0 && (
         <div className="mb-8 space-y-3">
@@ -267,7 +311,10 @@ export const PicksView: React.FC<PicksViewProps> = ({
           {openGames.map(game => {
             const entry = draft[game.id];
             return (
-              <div key={game.id}>
+              /* The card and the value assigned to it are one thing and must
+                 not be split by a page break — a printed game whose "Worth 3
+                 pts" landed on the next sheet reads as an unscored pick. */
+              <div key={game.id} className="break-inside-avoid">
                 <GameCard
                   game={game}
                   selectedTeamId={entry?.selectedTeamId}
@@ -278,11 +325,11 @@ export const PicksView: React.FC<PicksViewProps> = ({
 
                 {/* The selector only appears once a side is chosen — points
                     with no team attached are not a pick. */}
-                {entry?.selectedTeamId && (
-                  <label className="mt-2 flex items-center gap-2 px-1 text-sm text-muted">
+                {entry?.selectedTeamId ? (
+                  <label className="mt-2 flex items-center gap-2 px-1 text-sm text-muted print:font-bold">
                     Worth
                     <select
-                      className="rounded-control border border-line bg-surface px-2 py-1 text-ink"
+                      className="rounded-control border border-line bg-surface px-2 py-1 text-ink print:hidden"
                       value={entry.confidence ?? ''}
                       onChange={e => setConfidence(game.id, e.target.value)}
                     >
@@ -293,10 +340,29 @@ export const PicksView: React.FC<PicksViewProps> = ({
                         </option>
                       ))}
                     </select>
+
+                    {/* A dropdown prints as a dropdown: a box with a value in
+                        it and an arrow the reader cannot use. On paper it is
+                        just the value. */}
+                    <span className="hidden text-ink print:inline">
+                      {entry.confidence === BONUS_POINTS
+                        ? '3 pts — bonus'
+                        : entry.confidence === ORDINARY_POINTS
+                          ? '1 pt'
+                          : 'not set'}
+                    </span>
+
                     {entry.confidence == null && (
                       <span className="text-faint">not counted until set</span>
                     )}
                   </label>
+                ) : (
+                  /* Print only. A game left alone is part of the record — on
+                     screen the empty card says so plainly enough, but on paper
+                     a silent gap and a forgotten pick look identical. */
+                  <p className="mt-2 hidden px-1 text-sm font-bold text-faint print:block">
+                    No pick.
+                  </p>
                 )}
               </div>
             );
@@ -310,20 +376,29 @@ export const PicksView: React.FC<PicksViewProps> = ({
           {closedGames.map(game => {
             const pick = myPicks.find(p => p.gameId === game.id);
             return (
-              <GameCard
-                key={game.id}
-                game={game}
-                selectedTeamId={pick?.selectedTeamId}
-                confidence={pick?.confidence}
-                locked
-              />
+              <div key={game.id} className="break-inside-avoid">
+                <GameCard
+                  game={game}
+                  selectedTeamId={pick?.selectedTeamId}
+                  confidence={pick?.confidence}
+                  locked
+                />
+
+                {/* Same reason as the open section: on the printed record a
+                    game that closed with nothing on it has to say so. */}
+                {!pick && (
+                  <p className="mt-2 hidden px-1 text-sm font-bold text-faint print:block">
+                    No pick — this game closed without one.
+                  </p>
+                )}
+              </div>
             );
           })}
         </div>
       )}
 
       {openGames.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 border-t border-line bg-surface-sunken p-4 md:static md:mt-6 md:border-0 md:bg-transparent md:p-0">
+        <div className="fixed inset-x-0 bottom-0 border-t border-line bg-surface-sunken p-4 md:static md:mt-6 md:border-0 md:bg-transparent md:p-0 print:!hidden">
           {saveButton('lg', 'w-full')}
         </div>
       )}

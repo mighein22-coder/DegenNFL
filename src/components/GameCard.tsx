@@ -64,8 +64,11 @@ export const GameCard: React.FC<GameCardProps> = ({
         onClick={() => onSelectTeam?.(teamId)}
         className={[
           'flex flex-1 items-center gap-3 rounded-control border p-3 text-left transition-colors',
+          // `print-picked` is the only thing in the app that forces a
+          // background onto paper — see the rule in print.css for why this
+          // one earns it. On screen the class does nothing.
           picked
-            ? 'border-brand-400 bg-brand-900/40'
+            ? 'border-brand-400 bg-brand-900/40 print-picked'
             : 'border-line bg-surface hover:bg-surface-raised',
           // The fade says "you cannot click this". On paper nothing is
           // clickable and the fade only makes a locked pick — the part of the
@@ -82,11 +85,10 @@ export const GameCard: React.FC<GameCardProps> = ({
           style={{ backgroundColor: team?.logoColor ?? 'transparent' }}
         />
 
-        {/* On paper the picked side is marked rather than painted. The screen
-            says it with `bg-brand-900/40`, and a background is exactly what a
-            browser drops when printing — so this is not decoration, it is the
-            only thing on a printed card that says which team was taken. It
-            stands where the colour bar does so the rows stay aligned. */}
+        {/* The tick is the second carrier of the same fact the fill carries.
+            Both, deliberately: the fill is the one a low-toner printer or a
+            photocopy eats, and the tick is the one that survives it. It stands
+            where the colour bar does so the rows stay aligned. */}
         <span
           aria-hidden
           className={[

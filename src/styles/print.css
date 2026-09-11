@@ -16,10 +16,9 @@
  * than to a literal, redefining the raw tokens here flips EVERY screen, not
  * just the two with a print button on them.
  *
- * What is deliberately NOT done: forcing backgrounds with
- * `print-color-adjust: exact`. A picked game is marked `bg-brand-900/40`, and
- * forcing that would print a dark green block under dark text. The picked side
- * carries a printed tick instead — see GameCard.
+ * Backgrounds are forced in exactly ONE place, `.print-picked` below. Doing it
+ * globally would print every dark surface as a dark block under dark text;
+ * doing it nowhere left the picked side of a game carrying nothing but a tick.
  * ========================================================================== */
 
 @media print {
@@ -71,6 +70,29 @@
 
   .print-landscape {
     page: matrix;
+  }
+
+  /* THE ONE PLACE BACKGROUNDS ARE FORCED.
+   *
+   * On the pick sheet the fill is what says "this is the side I took", and a
+   * browser drops background-colour unless the member happens to have ticked
+   * Background graphics in the print dialog — a setting nobody should have to
+   * know about to get a readable record. print-color-adjust overrides that for
+   * this element only.
+   *
+   * The colour is stated here rather than left as `bg-brand-900/40`, which is
+   * 40% of a token this file has already turned near-white: over paper that
+   * lands around oklch(0.98) and is not a fill anybody would call green. This
+   * is the same hue, dropped to where it reads on the sheet without fighting
+   * the text over it. The tick stays regardless — the fill is the second
+   * carrier, not the only one, and a fax or a low-toner printer eats it.
+   *
+   * -webkit- first: the unprefixed property is recent, and the prefixed one is
+   * what older Chrome and every Safari actually honour. */
+  .print-picked {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background-color: oklch(0.91 0.06 155) !important;
   }
 
   /* Nothing on paper is going to be clicked, and a focus ring or a hover

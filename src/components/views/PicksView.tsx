@@ -326,7 +326,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
                 {/* The selector only appears once a side is chosen — points
                     with no team attached are not a pick. */}
                 {entry?.selectedTeamId ? (
-                  <label className="mt-2 flex items-center gap-2 px-1 text-sm text-muted">
+                  <label className="mt-2 flex items-center gap-2 px-1 text-sm text-muted print:font-bold">
                     Worth
                     <select
                       className="rounded-control border border-line bg-surface px-2 py-1 text-ink print:hidden"
@@ -360,7 +360,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
                   /* Print only. A game left alone is part of the record — on
                      screen the empty card says so plainly enough, but on paper
                      a silent gap and a forgotten pick look identical. */
-                  <p className="mt-2 hidden px-1 text-sm text-faint print:block">
+                  <p className="mt-2 hidden px-1 text-sm font-bold text-faint print:block">
                     No pick.
                   </p>
                 )}
@@ -387,7 +387,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
                 {/* Same reason as the open section: on the printed record a
                     game that closed with nothing on it has to say so. */}
                 {!pick && (
-                  <p className="mt-2 hidden px-1 text-sm text-faint print:block">
+                  <p className="mt-2 hidden px-1 text-sm font-bold text-faint print:block">
                     No pick — this game closed without one.
                   </p>
                 )}

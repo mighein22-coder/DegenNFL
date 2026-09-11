@@ -306,6 +306,34 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ---
 
+## Done (standings order, 2026-09-11)
+
+- [x] **One member order, on all three screens** (issues #22 and #23). The
+      Standings sort is now points desc → wins desc → **losses ascending** →
+      name, and the League Matrix lists its rows in that order instead of
+      floating members with a visible pick to the top.
+
+      The losses clause is not decoration. Wins descending already implies
+      losses ascending *when both members have played the same number of
+      picks* — so it only ever separates anybody after a missed week or a sheet
+      left short, which per-game locking makes an ordinary state here rather
+      than an exception. That is also why the tie test for a **shared rank**
+      had to grow the same third term: ranking two rows equal after the sort
+      had deliberately put one above the other is the table disagreeing with
+      itself.
+
+      #23 needed no ordering code. The Dashboard's top five already called
+      `computeStandings` at the same season scope the Standings screen opens
+      on, so it inherited the new order the moment the sort changed — the work
+      was pinning that (`src/lib/__tests__/standings.test.ts`) and saying so in
+      both files, so nobody later "fixes" the Dashboard by sorting it locally.
+
+      The Matrix orders by the **season** table, not the week being shown: a
+      per-week order would reshuffle every row each time the week selector
+      moved.
+
+---
+
 ## Done (printing, 2026-09-11)
 
 - [x] **Print buttons on the Matrix and the Picks sheet** (issue #24). Both

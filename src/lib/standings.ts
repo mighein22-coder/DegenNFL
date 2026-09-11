@@ -106,33 +106,65 @@ export function computeStandings(
 }
 
 /**
+ * The one ordering rule for members, everywhere they are listed.
+ *
+ * Points descending, then wins descending, then losses ASCENDING, then name
+ * A-Z. Wins break point ties because the same points off more correct picks
+ * means the confidence was spread better; losses break the rest because two
+ * members level on points and wins are not level if one of them got there
+ * having lost fewer — which happens here whenever somebody misses a week or
+ * leaves a pick off a sheet, so it is not the dead tiebreaker it would be in a
+ * pool where everyone always plays five.
+ *
+ * Name is last only so the order is stable, not because A-Z means anything.
+ *
+ * Deliberately NOT exported. Every screen that lists members — the Standings
+ * table, the Dashboard's top five, the League Matrix — reaches this rule by
+ * calling `computeStandings` and rendering the rows in the order it returns.
+ * All three being the same order is the feature (issues #22, #23), and a
+ * second caller sorting for itself is how that quietly stops being true.
+ */
+function compareStandings<T extends { wins: number; losses: number; name: string }>(
+  a: T,
+  b: T,
+  scoreOf: (row: T) => number
+): number {
+  return (
+    scoreOf(b) - scoreOf(a) ||
+    b.wins - a.wins ||
+    a.losses - b.losses ||
+    a.name.localeCompare(b.name)
+  );
+}
+
+/**
  * Sorts standings and assigns ranks.
  *
- * Ordering: points descending, then wins descending, then name A-Z. Wins break
- * point ties because a player who earned the same points from more correct picks
- * spread their confidence better.
+ * Ordering is `compareStandings` above.
  *
- * Ranks are *competition ranks*: players who tie on both points and wins share a
- * rank, and the next rank skips accordingly (1, 2, 2, 4).
+ * Ranks are *competition ranks*: members who tie on points, wins AND losses
+ * share a rank, and the next rank skips accordingly (1, 2, 2, 4). All three
+ * have to match — a rank shared by two rows the sort deliberately separated
+ * would be the table contradicting itself.
  *
  * `scoreKey` selects which points column drives the ordering, so season and
  * per-segment standings can share this function.
  */
-export function rankStandings<T extends { wins: number; name: string; rank: number }>(
-  rows: T[],
-  scoreKey: keyof T
-): T[] {
+export function rankStandings<
+  T extends { wins: number; losses: number; name: string; rank: number }
+>(rows: T[], scoreKey: keyof T): T[] {
   const score = (row: T) => Number(row[scoreKey] ?? 0);
 
-  const sorted = [...rows].sort(
-    (a, b) => score(b) - score(a) || b.wins - a.wins || a.name.localeCompare(b.name)
-  );
+  const sorted = [...rows].sort((a, b) => compareStandings(a, b, score));
 
   let lastRank = 0;
   return sorted.map((row, idx) => {
     const prev = sorted[idx - 1];
     const tiedWithPrev =
-      prev !== undefined && score(prev) === score(row) && prev.wins === row.wins;
+      prev !== undefined &&
+      score(prev) === score(row) &&
+      prev.wins === row.wins &&
+      prev.losses === row.losses;
 
     lastRank = tiedWithPrev ? lastRank : idx + 1;
     return { ...row, rank: lastRank };

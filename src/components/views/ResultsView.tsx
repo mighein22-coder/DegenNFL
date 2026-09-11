@@ -12,6 +12,7 @@ import {
   getProfiles
 } from '../../lib/supabaseService';
 import { formatSpread } from '../../lib/scoring';
+import { computeStandings } from '../../lib/standings';
 import {
   formatETTime,
   getCurrentWeekNumber,
@@ -33,6 +34,10 @@ import type { Game, Pick, Week } from '../../types';
  * mean 'not picked' or 'not yet revealed', and only the member who made it can
  * tell which. The column header says which state the game is in, and the note
  * under the grid says the rest.
+ *
+ * ROWS ARE IN SEASON STANDINGS ORDER, from `computeStandings` — the same order
+ * as the Standings screen and the Dashboard's top five, because they call the
+ * same function. Do not sort the members here.
  *
  * The spread shown is the FROZEN one on the game row — the number the results
  * were actually graded against, not whatever the market says now.
@@ -127,16 +132,25 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
     return map;
   }, [data, week]);
 
-  // Members with a visible pick first, then everyone else alphabetically, so
-  // the top of the grid is the part with something in it.
+  // In season standings order — the same order as the Standings screen and the
+  // Dashboard's top five, from the same function, so the grid reads as the
+  // table with the sheets filled in rather than as a second, unrelated list.
+  //
+  // Season, not this week: the row order would otherwise reshuffle every time
+  // the week selector moved, and the member you were following would be
+  // somewhere else on the next week's grid.
+  //
+  // This used to float members with a visible pick to the top. That is now
+  // gone deliberately — it was a second ordering rule, and it moved rows for a
+  // reason (whether a game has kicked off yet) that has nothing to do with
+  // where anyone stands.
   const members = useMemo(() => {
     if (!data) return [];
-    return [...data.profiles].sort((a, b) => {
-      const aHas = (picksByUser.get(a.id)?.size ?? 0) > 0 ? 0 : 1;
-      const bHas = (picksByUser.get(b.id)?.size ?? 0) > 0 ? 0 : 1;
-      return aHas - bHas || a.name.localeCompare(b.name);
-    });
-  }, [data, picksByUser]);
+    const byId = new Map(data.profiles.map(p => [p.id, p]));
+    return computeStandings(data.profiles, data.picks)
+      .map(row => byId.get(row.userId))
+      .filter((p): p is Profile => p != null);
+  }, [data]);
 
   const weekTotal = (userId: string): number => {
     const byGame = picksByUser.get(userId);

@@ -125,10 +125,11 @@ export const StandingsView: React.FC<StandingsViewProps> = ({ profile }) => {
             weeklyLabel={weeklyLabel}
           />
           <p className="mt-3 text-xs text-faint">
-            Ties are shared ranks: two members level on points and wins are both
-            second, and the next member is fourth. Points break first, then wins
-            — the same points from more correct picks means the confidence was
-            spread better.
+            Points break first, then wins — the same points from more correct
+            picks means the confidence was spread better — then fewest losses.
+            Ties are shared ranks: two members level on all three are both
+            second, and the next member is fourth. The Dashboard and the League
+            Matrix list members in this same order.
           </p>
         </>
       )}

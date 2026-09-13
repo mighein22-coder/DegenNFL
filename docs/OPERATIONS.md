@@ -209,9 +209,29 @@ without it, password reset links dead-end.
 
 ### Supabase auth configuration
 
-Allowlist `/auth/callback` under **Authentication → URL Configuration**. No
-application change substitutes for this. Verify password reset end to end
-against the deployed site after any change here.
+Two fields under **Authentication → URL Configuration**, and both matter:
+
+* **Site URL** — `https://degennfl.netlify.app`
+* **Redirect URLs** — `https://degennfl.netlify.app/**`, plus
+  `http://localhost:3000/**` if you want reset links to work in `npm run dev`.
+
+No application change substitutes for either. `LoginView` already passes
+`redirectTo: ${window.location.origin}/auth/callback`, which is right on every
+origin the app is served from — but **Supabase ignores a `redirectTo` that is
+not in Redirect URLs and silently substitutes Site URL instead.** It does not
+error, and the email still sends.
+
+That substitution is what a stale Site URL looks like from the member's side:
+the reset email arrives, the link works, Supabase consumes the token — and then
+bounces the browser to `http://localhost:3000/auth/callback`, where the member
+gets *This site can't be reached*. Nothing in the app logs, because the app was
+never reached. The default Site URL on a new project is `http://localhost:3000`,
+which is also this app's Vite dev port, so it reads like a local-dev artifact
+rather than a setting nobody changed after the first deploy.
+
+Verify password reset end to end against the deployed site after any change
+here. A member whose link already bounced can simply request a new one — the
+bounced token was spent, but nothing about their account is stuck.
 
 ---
 

@@ -12,6 +12,8 @@ import {
   getProfiles
 } from '../../lib/supabaseService';
 import { formatSpread } from '../../lib/scoring';
+import { computeStandings } from '../../lib/standings';
+import { getSegmentForWeekId } from '../../lib/segments';
 import {
   formatETTime,
   getCurrentWeekNumber,
@@ -33,6 +35,16 @@ import type { Game, Pick, Week } from '../../types';
  * mean 'not picked' or 'not yet revealed', and only the member who made it can
  * tell which. The column header says which state the game is in, and the note
  * under the grid says the rest.
+ *
+ * ROWS ARE IN STANDINGS ORDER, from `computeStandings` — the same function the
+ * Standings screen and the Dashboard's top five call, so the tiebreaker is
+ * theirs (points, wins, fewest losses, name). Do not sort the members here.
+ *
+ * What the pills change is the SCOPE that order is computed over, not the rule
+ * (issue #27). The default is this week, because the grid's own Pts column is
+ * a week total — open on Season and the one number column on screen reads as
+ * unsorted, which is the table looking broken. Season and Segment are a step
+ * back from the sheets on screen, and both say so on the pill.
  *
  * The spread shown is the FROZEN one on the game row — the number the results
  * were actually graded against, not whatever the market says now.
@@ -64,9 +76,19 @@ interface Loaded {
   profiles: Profile[];
 }
 
+/**
+ * Which slice of the season the row order is computed over.
+ *
+ * Both narrower scopes hang off the week already chosen in the selector, so
+ * there is no second control to keep in step: SEGMENT means the segment that
+ * week falls in, not some separately picked one.
+ */
+type SortScope = 'WEEK' | 'SEGMENT' | 'SEASON';
+
 export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
   const now = useNow();
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
+  const [sortScope, setSortScope] = useState<SortScope>('WEEK');
 
   const load = useCallback(async (): Promise<Loaded> => {
     const [weeks, picks, profiles] = await Promise.all([
@@ -127,16 +149,37 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
     return map;
   }, [data, week]);
 
-  // Members with a visible pick first, then everyone else alphabetically, so
-  // the top of the grid is the part with something in it.
+  // The segment the displayed week sits in. Null only if the week id is out of
+  // the 18-week range, which would be a corrupt row rather than a state to
+  // design for — the scope falls back to the season rather than to an empty
+  // table if it ever happens.
+  const segmentNumber = useMemo(
+    () => (week ? (getSegmentForWeekId(week.id)?.number ?? null) : null),
+    [week]
+  );
+
+  // In standings order, from the same function the Standings screen and the
+  // Dashboard use, over whichever scope the pills have selected. The grid then
+  // reads as that table with the sheets filled in, rather than as a second,
+  // unrelated list.
+  //
+  // This used to float members with a visible pick to the top. That is gone
+  // deliberately — it was a second ordering rule, and it moved rows for a
+  // reason (whether a game has kicked off yet) that has nothing to do with
+  // where anyone stands.
   const members = useMemo(() => {
-    if (!data) return [];
-    return [...data.profiles].sort((a, b) => {
-      const aHas = (picksByUser.get(a.id)?.size ?? 0) > 0 ? 0 : 1;
-      const bHas = (picksByUser.get(b.id)?.size ?? 0) > 0 ? 0 : 1;
-      return aHas - bHas || a.name.localeCompare(b.name);
-    });
-  }, [data, picksByUser]);
+    if (!data || !week) return [];
+    const within =
+      sortScope === 'WEEK'
+        ? { week: week.id }
+        : sortScope === 'SEGMENT' && segmentNumber != null
+          ? { segment: segmentNumber }
+          : null;
+    const byId = new Map(data.profiles.map(p => [p.id, p]));
+    return computeStandings(data.profiles, data.picks, { within })
+      .map(row => byId.get(row.userId))
+      .filter((p): p is Profile => p != null);
+  }, [data, week, sortScope, segmentNumber]);
 
   const weekTotal = (userId: string): number => {
     const byGame = picksByUser.get(userId);
@@ -178,20 +221,51 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
 
   const hiddenColumns = games.filter(game => !isGameLocked(game.startTime, now)).length;
 
+  // Labelled by what they cover, not by the word "sort": a member reading
+  // "Segment 2" against a week 9 grid can see which weeks are being counted
+  // without being told what a sort scope is.
+  const scopeLabel: Record<SortScope, string> = {
+    WEEK: `Week ${week.weekNumber}`,
+    SEGMENT: segmentNumber == null ? 'Segment' : `Segment ${segmentNumber}`,
+    SEASON: 'Season'
+  };
+
+  const scopePill = (value: SortScope) => (
+    <button
+      key={value}
+      type="button"
+      onClick={() => setSortScope(value)}
+      aria-pressed={sortScope === value}
+      className={[
+        'rounded-control border px-3 py-1.5 text-sm transition-colors',
+        sortScope === value
+          ? 'border-brand-400 bg-brand-900/40 text-ink'
+          : 'border-line bg-surface text-muted hover:bg-surface-raised hover:text-ink'
+      ].join(' ')}
+    >
+      {scopeLabel[value]}
+    </button>
+  );
+
   return (
     <section className="print-landscape mx-auto max-w-6xl print:max-w-none">
+      {/* No subtitle: the pills need the room, and the line it replaced said
+          what the grid itself says. What the subtitle WAS carrying is the week
+          number on paper — the week selector is print:hidden — so that moved
+          to the printed caption below, along with the scope, which paper would
+          otherwise have no way to tell between two identical-looking grids. */}
       <PageHeader
         title="League Matrix"
-        subtitle={
-          <>
-            Week {week.weekNumber} — every sheet, against the lines the results
-            were graded on.
-          </>
-        }
         actions={
           <>
             <PrintButton label="Print matrix" />
-            {/* Which week this is comes from the subtitle on paper, so the
+            {/* Screen only. On paper the caption below names the scope in
+                words, which reads better than a highlighted button. */}
+            <span className="flex flex-wrap items-center gap-2 print:hidden">
+              <span className="text-sm text-muted">Order by</span>
+              {(['WEEK', 'SEGMENT', 'SEASON'] as SortScope[]).map(scopePill)}
+            </span>
+            {/* Which week this is comes from the printed caption, so the
                 control that changes it is not worth the ink. */}
             <label className="flex items-center gap-2 text-sm text-muted print:hidden">
               Week
@@ -212,6 +286,16 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
           </>
         }
       />
+
+      {/* Paper only. Two printed matrices are otherwise indistinguishable: the
+          week selector and the scope pills are both screen controls, so
+          without this a sheet says neither which week it is nor why the rows
+          are in the order they are in. */}
+      <p className="hidden print:block print:mb-2 print:text-[10px]">
+        Week {week.weekNumber} — every sheet, against the lines the results were
+        graded on. Members in order of {scopeLabel[sortScope].toLowerCase()}{' '}
+        points, then wins, then fewest losses.
+      </p>
 
       {/* Desktop, and paper. `print:!block` and `print:overflow-visible` are
           both load-bearing — see the note at the top of the file. */}

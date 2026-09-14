@@ -32,8 +32,9 @@ A scaffold, not a working pool. Honestly:
 The NHL app is the reference, and most of it carries over unchanged: React 19 +
 Vite, Supabase for auth and data, Netlify for hosting and functions, the same
 three-package layout (`/`, `src/`, `netlify/functions/`), the same
-`computeStandings` with its points → wins → name tiebreaker and competition
-ranks, similar pick model (five games, confidence is 4 games at 1 point and 1 game at 3 points, no duplicates).
+`computeStandings` and its competition ranks — though the tiebreaker has since
+diverged: this pool breaks a points-and-wins tie on **fewest losses** before it
+falls back to the name (issue #22) — similar pick model (five games, confidence is 4 games at 1 point and 1 game at 3 points, no duplicates).
 
 The security model carries over *deliberately and completely*. FrozenDegenerates
 reached its current state over eight migrations, most written after a review
@@ -91,7 +92,9 @@ This is the highest-leverage decision in the app, because of what it removes:
 * no `PUSH` result to thread through the schema, the scoring and the UI
 * `points_earned` stays an **integer** — standings never show 27.5
 * `gradePick` has two branches instead of three
-* `src/lib/standings.ts` ported across **completely untouched**
+* `src/lib/standings.ts` ported across with **nothing to change for it** — the
+  later tiebreaker and Matrix-ordering work (issue #22) touched the file, but
+  no part of it has ever had to know about a push
 
 It is enforced twice: in `hookSpread()` at capture time, and as a `CHECK`
 constraint on `games.spread`. The constraint is the one that actually

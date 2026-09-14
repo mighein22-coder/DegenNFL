@@ -102,6 +102,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ profile }) => {
     [data, myPicks, now]
   );
 
+  // Season scope, with no segment — which is exactly what the Standings screen
+  // opens on, so the top five here is the top five there and not a differently
+  // sorted shortlist. The order itself lives in `compareStandings`; nothing on
+  // this screen may re-sort the rows.
   const standings = useMemo(
     () => (data ? computeStandings(data.profiles, data.allPicks) : []),
     [data]

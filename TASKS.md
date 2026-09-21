@@ -306,6 +306,34 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ---
 
+## Done (matrix status, 2026-09-21)
+
+- [x] **The Matrix said "hidden" about picks it was already showing** (issue
+      #29). The column header asked `isGameLocked`, which is kickoff and only
+      kickoff, so on Monday morning the Monday night column read
+      `hidden · 12h 15m` while the cells beneath it displayed everyone's pick
+      on that game.
+
+      The database reveals on `pick_locked()` — `start_time` **or** the week's
+      `final_lock_at` — so the Sunday 13:00 ET lock reveals the whole rest of
+      the sheet, Monday night included. `isPickLocked` is that expression on
+      the client and the header now asks it: an un-kicked-off game reads
+      `in 1d 3h` once the week has closed, and keeps `hidden · …` only while
+      the week is genuinely open.
+
+      Two things travelled with it, because they were the same wrong rule
+      stated twice more: the note under the grid now names both reveal
+      moments rather than just kickoff, and its unrevealed-column count is
+      `!isPickLocked` rather than "has not kicked off", so it stops warning
+      about a secrecy that has already ended.
+
+      The decision moved out of the view into `src/lib/matrixColumn.ts` and
+      got a test (`matrixColumn.test.ts`, 7 assertions) — which of the two
+      locks fires when is the whole content of this bug, and it was previously
+      a ternary in a header cell with nothing pinning it.
+
+---
+
 ## Done (standings order, 2026-09-11)
 
 - [x] **One member order, on all three screens** (issues #22 and #23). The

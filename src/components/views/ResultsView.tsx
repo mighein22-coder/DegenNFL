@@ -14,12 +14,8 @@ import {
 import { formatSpread } from '../../lib/scoring';
 import { computeStandings } from '../../lib/standings';
 import { getSegmentForWeekId } from '../../lib/segments';
-import {
-  formatETTime,
-  getCurrentWeekNumber,
-  isGameLocked,
-  getTimeUntil
-} from '../../lib/timezone';
+import { getCurrentWeekNumber, isPickLocked } from '../../lib/timezone';
+import { matrixColumnStatus } from '../../lib/matrixColumn';
 import { TEAMS } from '../../constants';
 import type { Profile } from '../../lib/supabase';
 import type { Game, Pick, Week } from '../../types';
@@ -219,7 +215,13 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
     );
   }
 
-  const hiddenColumns = games.filter(game => !isGameLocked(game.startTime, now)).length;
+  // Unrevealed, NOT merely un-kicked-off. Once the week's final lock passes,
+  // every pick in it is visible whether or not the game has started, so after
+  // Sunday 13:00 ET this is zero and the note below stops warning about a
+  // secrecy that has ended (issue #29).
+  const hiddenColumns = games.filter(
+    game => !isPickLocked(week.weekNumber, game.startTime, now)
+  ).length;
 
   // Labelled by what they cover, not by the word "sort": a member reading
   // "Segment 2" against a week 9 grid can see which weeks are being counted
@@ -308,7 +310,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
               </th>
               {games.map(game => (
                 <th key={game.id} scope="col" className="px-2 py-2 font-normal print:px-1">
-                  <GameColumnHeader game={game} now={now} />
+                  <GameColumnHeader game={game} weekNumber={week.weekNumber} now={now} />
                 </th>
               ))}
               <th scope="col" className="px-3 py-2 text-right font-normal">
@@ -420,12 +422,15 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
         })}
       </div>
 
+      {/* Both reveal rules, because only saying the first one made the grid
+          look broken every Monday: it reveals on kickoff OR on the Sunday
+          lock, so a Monday night game is public from Sunday afternoon. */}
       <p className="mt-4 text-xs text-faint">
         A blank cell means either no pick or a pick not yet revealed — picks
-        become visible as each game kicks off, one game at a time, and until then
-        nobody can see them.
+        become visible as each game kicks off, and the Sunday 1:00 PM ET lock
+        reveals whatever is left.
         {hiddenColumns > 0 &&
-          ` ${hiddenColumns} ${hiddenColumns === 1 ? 'game has' : 'games have'} not kicked off yet, so only your own picks show in ${hiddenColumns === 1 ? 'that column' : 'those columns'}.`}
+          ` ${hiddenColumns} ${hiddenColumns === 1 ? 'game is' : 'games are'} not revealed yet, so only your own picks show in ${hiddenColumns === 1 ? 'that column' : 'those columns'}.`}
       </p>
     </section>
   );
@@ -437,11 +442,18 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
  * The spread is written from the home team's point of view, which is how it is
  * stored — so `PHI -3.5` against a home Philadelphia reads the same way it does
  * on the pick sheet.
+ *
+ * The status line is `matrixColumnStatus`, which needs the WEEK and not just
+ * the game: a game that has not kicked off is only hidden while the week is
+ * still open. See the note on that function.
  */
-const GameColumnHeader: React.FC<{ game: Game; now: Date }> = ({ game, now }) => {
+const GameColumnHeader: React.FC<{ game: Game; weekNumber: number; now: Date }> = ({
+  game,
+  weekNumber,
+  now
+}) => {
   const away = TEAMS[game.awayTeamId]?.abbreviation ?? game.awayTeamId;
   const home = TEAMS[game.homeTeamId]?.abbreviation ?? game.homeTeamId;
-  const locked = isGameLocked(game.startTime, now);
 
   return (
     <span className="block whitespace-nowrap">
@@ -452,11 +464,7 @@ const GameColumnHeader: React.FC<{ game: Game; now: Date }> = ({ game, now }) =>
         {game.spread == null ? 'no line' : `${home} ${formatSpread(game.spread, true)}`}
       </span>
       <span className="block text-[11px] text-faint">
-        {game.status === 'FINAL' && game.homeScore != null && game.awayScore != null
-          ? `${game.awayScore}–${game.homeScore}`
-          : locked
-            ? formatETTime(new Date(game.startTime), 'EEE h:mm a')
-            : `hidden · ${getTimeUntil(new Date(game.startTime), now)}`}
+        {matrixColumnStatus(weekNumber, game, now).label}
       </span>
     </span>
   );

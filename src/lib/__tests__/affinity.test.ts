@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { computeTeamAffinity } from '../affinity';
-import { BONUS_POINTS, ORDINARY_POINTS } from '../../constants';
+import { completedWeekPicks, computeTeamAffinity } from '../affinity';
+import { getWeekRolloverAt } from '../timezone';
+import { BONUS_POINTS, ORDINARY_POINTS, SEASON } from '../../constants';
 import type { Game, Pick } from '../../types';
 
 /**
@@ -35,6 +36,78 @@ function pick(gameId: string, teamId: string, result: Pick['result'], confidence
     result
   };
 }
+
+/**
+ * Whose picks, and from which weeks.
+ *
+ * The screen offers any member, and other members' picks arrive a game at a
+ * time — so the two things worth pinning down are that a week still being
+ * played contributes nothing, and that the rule does not quietly exempt the
+ * member doing the looking.
+ */
+describe('completedWeekPicks', () => {
+  // Mid-week 2: week 1 is over, week 2 is being played.
+  const midWeek2 = new Date(getWeekRolloverAt(1).getTime() + 60_000);
+
+  function weekPick(weekNumber: number, userId: string, teamId: string): Pick {
+    const weekId = `week-${SEASON}-${String(weekNumber).padStart(2, '0')}`;
+    return {
+      userId,
+      weekId,
+      gameId: `${weekId}-${teamId}`,
+      selectedTeamId: teamId,
+      confidence: ORDINARY_POINTS,
+      pointsEarned: ORDINARY_POINTS,
+      result: 'WIN'
+    };
+  }
+
+  it('keeps only the named member', () => {
+    const picks = [weekPick(1, 'me', 'PHI'), weekPick(1, 'you', 'DAL')];
+    expect(completedWeekPicks(picks, 'me', midWeek2).map(p => p.selectedTeamId)).toEqual([
+      'PHI'
+    ]);
+  });
+
+  it('drops the week being played', () => {
+    const picks = [weekPick(1, 'me', 'PHI'), weekPick(2, 'me', 'KC')];
+    expect(completedWeekPicks(picks, 'me', midWeek2).map(p => p.selectedTeamId)).toEqual([
+      'PHI'
+    ]);
+  });
+
+  it('drops it for the signed-in member too — every column is measured alike', () => {
+    // Same assertion as above, stated as the rule it is: there is no 'own
+    // picks' exemption, because two members compared on this screen have to be
+    // counted over the same weeks.
+    const beforeAnyWeekEnds = new Date(getWeekRolloverAt(1).getTime() - 60_000);
+    expect(completedWeekPicks([weekPick(1, 'me', 'PHI')], 'me', beforeAnyWeekEnds)).toEqual(
+      []
+    );
+  });
+
+  it('counts a week from the moment it rolls over, not from its Sunday lock', () => {
+    const picks = [weekPick(1, 'me', 'PHI')];
+    expect(completedWeekPicks(picks, 'me', getWeekRolloverAt(1))).toHaveLength(1);
+    expect(
+      completedWeekPicks(picks, 'me', new Date(getWeekRolloverAt(1).getTime() - 1))
+    ).toHaveLength(0);
+  });
+
+  it('drops a pick whose week id does not parse', () => {
+    const orphan: Pick = { ...weekPick(1, 'me', 'PHI'), weekId: 'not-a-week' };
+    expect(completedWeekPicks([orphan], 'me', midWeek2)).toEqual([]);
+  });
+
+  it('settles another season by the season, not by this season’s clock', () => {
+    const last: Pick = { ...weekPick(1, 'me', 'PHI'), weekId: `week-${SEASON - 1}-18` };
+    const next: Pick = { ...weekPick(1, 'me', 'DAL'), weekId: `week-${SEASON + 1}-01` };
+    // Week 18 of last season is finished however early in this one it is read.
+    expect(completedWeekPicks([last, next], 'me', midWeek2).map(p => p.weekId)).toEqual([
+      `week-${SEASON - 1}-18`
+    ]);
+  });
+});
 
 describe('computeTeamAffinity', () => {
   it('returns nothing when nothing has been picked', () => {

@@ -306,6 +306,53 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ---
 
+## Done (affinity selector, 2026-09-22)
+
+- [x] **Team Affinity reads any member, not only the one signed in** (issue
+      #31). A `Member` selector beside the title, defaulting to yourself. The
+      table, the bye-week rule and the records column are untouched; whose
+      picks feed them is now a piece of state.
+
+      One load covers the league — picks, profiles and every week's games are
+      fetched once and the selector filters in memory, the same shape the
+      Matrix's week selector has. Flicking between members costs nothing.
+
+- [x] **Only completed weeks count, for everybody** — the condition Mike
+      attached to the selector, and the thing that makes it safe to offer.
+      `picks_select_visible` releases another member's picks a game at a time,
+      so on a Sunday morning their "season" here would be whichever fraction of
+      their sheet has kicked off: a real row, honestly fetched, and a false
+      picture of who they back.
+
+      **It applies to your own picks too.** Your in-flight week is complete in
+      the data, so leaving it in would make your numbers the one set on the
+      screen measured over a different span — and comparing members is the
+      entire reason the selector exists. My History still shows the week being
+      played in full, which is where it belongs.
+
+      The pending column survives this and still means something: `sync-week`
+      only runs when somebody opens a page, so a week can roll over with picks
+      on it not yet graded.
+
+- [x] `isWeekComplete()` in `timezone.ts` — a week is over at its **Tuesday
+      18:00 ET rollover**, not at the Sunday lock. Those are different
+      questions and `isWeekLocked` was only answering one: between Sunday
+      13:00 and Monday night a week is shut and unfinished at the same time.
+      Rollover is the first instant every game in it has been played and
+      scored.
+
+- [x] `completedWeekPicks()` in `affinity.ts` holds the member-and-week
+      filter, so the rule is testable without a database and the view stays a
+      container. A pick whose week id will not parse is dropped, like a pick
+      whose game is missing; another season's week is settled by the season
+      rather than by this season's clock, which would otherwise put a finished
+      2025 week in the future.
+
+- [x] 164 unit tests passing (8 new); `npm run build` and `npm run typecheck`
+      clean.
+
+---
+
 ## Done (matrix status, 2026-09-21)
 
 - [x] **The Matrix said "hidden" about picks it was already showing** (issue

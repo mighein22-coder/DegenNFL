@@ -7,6 +7,7 @@ import {
   isPickLocked,
   getCurrentWeekNumber,
   getWeekRolloverAt,
+  isWeekComplete,
   getWeekOpensAt,
   buildWeekId,
   parseWeekId,
@@ -175,6 +176,28 @@ describe('getWeekRolloverAt', () => {
     for (let w = 1; w < WEEK_COUNT; w++) {
       expect(getWeekRolloverAt(w).getTime()).toBeGreaterThan(getFinalLockAt(w).getTime());
       expect(getWeekRolloverAt(w).getTime()).toBeLessThan(getFinalLockAt(w + 1).getTime());
+    }
+  });
+});
+
+describe('isWeekComplete', () => {
+  it('is false while the week is merely locked, and true once it rolls over', () => {
+    const lock = getFinalLockAt(3);
+    const rollover = getWeekRolloverAt(3);
+
+    // Sunday 13:01 ET: no more picks, and two days of football still to play.
+    expect(isWeekLocked(3, new Date(lock.getTime() + 60_000))).toBe(true);
+    expect(isWeekComplete(3, new Date(lock.getTime() + 60_000))).toBe(false);
+
+    expect(isWeekComplete(3, new Date(rollover.getTime() - 60_000))).toBe(false);
+    expect(isWeekComplete(3, new Date(rollover.getTime() + 60_000))).toBe(true);
+  });
+
+  it('holds for every week of the season', () => {
+    for (let w = 1; w <= WEEK_COUNT; w++) {
+      const rollover = getWeekRolloverAt(w);
+      expect(isWeekComplete(w, new Date(rollover.getTime() - 1))).toBe(false);
+      expect(isWeekComplete(w, rollover)).toBe(true);
     }
   });
 });

@@ -334,21 +334,34 @@ Read `PLANNING.md` for why things are shaped the way they are.
       only runs when somebody opens a page, so a week can roll over with picks
       on it not yet graded.
 
-- [x] `isWeekComplete()` in `timezone.ts` — a week is over at its **Tuesday
-      18:00 ET rollover**, not at the Sunday lock. Those are different
-      questions and `isWeekLocked` was only answering one: between Sunday
-      13:00 and Monday night a week is shut and unfinished at the same time.
-      Rollover is the first instant every game in it has been played and
-      scored.
+- [x] **A week is over when its GAMES are over**, which is the second cut of
+      this and the one that works. `completedWeekIds()` in `affinity.ts`
+      calls a week complete once every game in it is FINAL with a score.
 
-- [x] `completedWeekPicks()` in `affinity.ts` holds the member-and-week
-      filter, so the rule is testable without a database and the view stays a
-      container. A pick whose week id will not parse is dropped, like a pick
-      whose game is missing; another season's week is settled by the season
-      rather than by this season's clock, which would otherwise put a finished
-      2025 week in the future.
+      The first cut read "completed" off the **Tuesday 18:00 ET rollover**, and
+      Mike caught it the same day: week 2's Monday night game had finished and
+      been scored, everyone had read the results off the Matrix, and Affinity
+      still showed week 1 only — it was waiting for a calendar tick a full day
+      after the football had stopped. A week does not become complete because
+      the week after it starts.
 
-- [x] 164 unit tests passing (8 new); `npm run build` and `npm run typecheck`
+      Asking the games needs no calendar, no clock and no season, and it is the
+      same condition `sync-week` closes a week on (`weekLifecycle.ts`), so the
+      screen and the server agree on the word. `isWeekComplete()` in
+      `timezone.ts` is gone rather than left unused — it encoded the wrong
+      rule, and dead code that answers a live question wrongly is a trap.
+
+      A score is required as well as the status: `sync-week` writes the two
+      together and grades only against a game with both. A week with no games
+      is **not** complete — a week row exists days before its schedule is
+      seeded, and nothing to be over is not the same as over.
+
+- [x] `completedWeekPicks()` holds the member-and-week filter, so the rule is
+      testable without a database and the view stays a container. It needs the
+      whole slate of each week, not just the games picked, which is what
+      `getGamesForWeeks` already returns.
+
+- [x] 162 unit tests passing (6 new); `npm run build` and `npm run typecheck`
       clean.
 
 ---

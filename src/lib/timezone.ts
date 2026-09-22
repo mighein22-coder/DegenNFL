@@ -131,23 +131,6 @@ export function getWeekRolloverAt(weekNumber: number): Date {
 }
 
 /**
- * Whether a week is FINISHED — not merely closed.
- *
- * A week stops taking picks at Sunday 13:00 ET, but the games those picks are
- * graded on run until Monday night. Between those two moments a week is shut
- * and unfinished at the same time, and `isWeekLocked` cannot tell them apart
- * because it is not asking that question.
- *
- * Rollover is the first instant at which every game in the week has kicked off,
- * finished and been scored, so it is what a screen means by "completed". Any
- * earlier boundary hands out a partial slate: a member's Thursday pick with
- * their Sunday four still to come is not a week, it is a fifth of one.
- */
-export function isWeekComplete(weekNumber: number, now: Date = new Date()): boolean {
-  return now >= getWeekRolloverAt(weekNumber);
-}
-
-/**
  * When a week's sheet opens: the TUESDAY before its Sunday, 18:00 ET.
  *
  * The same instant as `getWeekRolloverAt(weekNumber - 1)` for every week but

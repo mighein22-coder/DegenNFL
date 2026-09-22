@@ -1,5 +1,3 @@
-import { isWeekComplete, parseWeekId } from './timezone';
-import { SEASON } from '../constants';
 import type { Game, Pick } from '../types';
 
 /**
@@ -31,12 +29,49 @@ export interface TeamAffinityRow {
 }
 
 /**
+ * The weeks whose football is over: every game in them final, with a score.
+ *
+ * THE CALENDAR IS NOT THE ANSWER, and reading it off one is what the first cut
+ * of this got wrong. It took "completed" from the Tuesday 18:00 ET rollover, so
+ * a week whose Monday night game had finished and been scored still did not
+ * count until the following evening — the screen sat a full day behind results
+ * every member had already seen on the Matrix.
+ *
+ * Asking the games instead needs no calendar, no clock and no season: a week is
+ * over when its last game is over, whenever that happens to be. It is also the
+ * same condition `sync-week` closes a week on (`weekLifecycle.ts`), so this
+ * screen and the server agree on what "completed" means.
+ *
+ * A SCORE is required as well as the FINAL status. `sync-week` writes the two
+ * together and grades picks only against a game that has both, so a final game
+ * without a score is one whose picks cannot have been resolved yet.
+ *
+ * A week with NO games is not complete. Nothing to be over is not the same as
+ * being over, and a week row exists from the moment somebody opens the app in
+ * it — days before its schedule is seeded.
+ */
+export function completedWeekIds(games: Game[]): Set<string> {
+  const weeks = new Set<string>();
+  const unfinished = new Set<string>();
+
+  for (const game of games) {
+    weeks.add(game.weekId);
+    if (game.status !== 'FINAL' || game.homeScore == null || game.awayScore == null) {
+      unfinished.add(game.weekId);
+    }
+  }
+
+  for (const weekId of unfinished) weeks.delete(weekId);
+  return weeks;
+}
+
+/**
  * One member's picks, from the weeks that are actually over.
  *
- * WHY A WEEK IN FLIGHT IS NOT COUNTED. The screen now reads any member, not
- * just the one signed in, and other members' picks arrive a game at a time:
- * RLS reveals each one at its own kickoff, and the Sunday 13:00 ET lock
- * releases the rest. So on a Sunday morning another member's "season" is one
+ * WHY A WEEK IN FLIGHT IS NOT COUNTED. The screen reads any member, not just
+ * the one signed in, and other members' picks arrive a game at a time: RLS
+ * reveals each one at its own kickoff, and the Sunday 13:00 ET lock releases
+ * the rest. So on a Sunday morning another member's "season" is one
  * Thursday-night pick — a real row, honestly fetched, and a completely false
  * picture of who they back. Counting whole weeks only is what makes two members
  * on this screen comparable.
@@ -46,38 +81,17 @@ export interface TeamAffinityRow {
  * numbers the one set on the screen that is measured differently. `My History`
  * is where the week being played belongs, and it still shows all of it.
  *
- * Weeks are cached by id rather than re-derived per pick — five picks a week
- * for eighteen weeks is a lot of `parseWeekId` for eighteen answers.
+ * `games` must be every game of the weeks being considered, not only the games
+ * picked — a week is judged by its whole slate. `getGamesForWeeks` returns
+ * exactly that.
  */
 export function completedWeekPicks(
   picks: Pick[],
-  userId: string,
-  now: Date = new Date()
+  games: Game[],
+  userId: string
 ): Pick[] {
-  const decided = new Map<string, boolean>();
-
-  return picks.filter(pick => {
-    if (pick.userId !== userId) return false;
-
-    let complete = decided.get(pick.weekId);
-    if (complete === undefined) {
-      const parsed = parseWeekId(pick.weekId);
-      complete =
-        parsed == null
-          ? // A week id that does not parse has no calendar behind it, so there
-            // is no honest way to say whether it is over. Dropped, like a pick
-            // whose game is missing below.
-            false
-          : parsed.season === SEASON
-            ? isWeekComplete(parsed.weekNumber, now)
-            : // Another season's week is decided by the season, not the clock:
-              // `isWeekComplete` measures against THIS season's calendar and
-              // would put a finished 2025 week 5 in the future.
-              parsed.season < SEASON;
-      decided.set(pick.weekId, complete);
-    }
-    return complete;
-  });
+  const complete = completedWeekIds(games);
+  return picks.filter(pick => pick.userId === userId && complete.has(pick.weekId));
 }
 
 /**

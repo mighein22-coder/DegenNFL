@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { EmptyNote, ErrorNote, LoadingNote, PageHeader } from '../Page';
 import { useLoader } from '../../hooks/useLoader';
-import { useNow } from '../../hooks/useNow';
 import {
   getAllPicks,
   getGamesForWeeks,
@@ -33,6 +32,11 @@ import type { Game, Pick } from '../../types';
  * the signed-in member too, so every member the selector can reach is measured
  * the same way. My History is where the week being played belongs.
  *
+ * A week is over WHEN ITS GAMES ARE — not on the Tuesday rollover, which is
+ * where this first looked and which left the screen a day behind the scores
+ * everyone had already read off the Matrix. So the games are loaded for their
+ * own sake here, not only to attribute a pick to a side.
+ *
  * The team's own W-L comes from the `team-records` function, and its response
  * shape is ESPN's and undocumented — see the TODO at the top of that file. So
  * it is fetched separately and a failure costs the COLUMN, not the page. The
@@ -60,16 +64,15 @@ interface Loaded {
 }
 
 export const TeamStatsView: React.FC<TeamStatsViewProps> = ({ profile }) => {
-  const now = useNow();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const load = useCallback(async (): Promise<Loaded> => {
     const [picks, profiles] = await Promise.all([getAllPicks(), getProfiles()]);
 
-    // Every week anyone has a visible pick in, not only the weeks that are
-    // over. The completed-week filter is applied at render time against a
-    // ticking clock, so a week that finishes while the page is open must not
-    // arrive with its games missing.
+    // Every week anyone has a visible pick in. This has to be the whole
+    // slate of each of those weeks and not just the games picked, because a
+    // week counts here only once EVERY game in it is final — which is a
+    // question about the schedule, not about anyone's sheet.
     const weekIds = [...new Set(picks.map(pick => pick.weekId))];
 
     const [games, records] = await Promise.all([
@@ -107,8 +110,8 @@ export const TeamStatsView: React.FC<TeamStatsViewProps> = ({ profile }) => {
   );
 
   const counted = useMemo(
-    () => (data ? completedWeekPicks(data.picks, member.id, now) : []),
-    [data, member.id, now]
+    () => (data ? completedWeekPicks(data.picks, data.games, member.id) : []),
+    [data, member.id]
   );
 
   const rows = useMemo(
@@ -297,10 +300,9 @@ export const TeamStatsView: React.FC<TeamStatsViewProps> = ({ profile }) => {
         number in brackets under W-L is the picks still to be graded.{' '}
         {weeksCounted > 0 &&
           `${weeksCounted} completed ${weeksCounted === 1 ? 'week is' : 'weeks are'} counted. `}
-        A week counts once it is over — the Tuesday after its Sunday, by which
-        point every game in it has been played and scored. The week being played
-        is left out for every member alike, because picks on it are revealed a
-        game at a time and a part-revealed sheet is not a season.
+        A week counts as soon as every game in it is final and scored. The week
+        being played is left out for every member alike, because picks on it are
+        revealed a game at a time and a part-revealed sheet is not a season.
         {!data.records &&
           ' Team records are unavailable right now, so that column is hidden rather than guessed at.'}
       </p>

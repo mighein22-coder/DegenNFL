@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeTeamAffinity } from '../affinity';
+import { completedWeekPicks, computeTeamAffinity } from '../affinity';
 import { BONUS_POINTS, ORDINARY_POINTS } from '../../constants';
 import type { Game, Pick } from '../../types';
 
@@ -35,6 +35,109 @@ function pick(gameId: string, teamId: string, result: Pick['result'], confidence
     result
   };
 }
+
+/**
+ * Whose picks, and from which weeks.
+ *
+ * The screen offers any member, and other members' picks arrive a game at a
+ * time — so the two things worth pinning down are that a week still being
+ * played contributes nothing, and that the rule does not quietly exempt the
+ * member doing the looking.
+ *
+ * A WEEK IS OVER WHEN ITS GAMES ARE, which is the fix for the bug this block
+ * was rewritten for: the first cut read "completed" off the Tuesday 18:00 ET
+ * rollover, so week 2 stayed invisible all the Tuesday after its Monday night
+ * game had finished and been scored.
+ */
+describe('completedWeekPicks', () => {
+  function weekGame(weekId: string, id: string, status: Game['status']): Game {
+    return {
+      id,
+      weekId,
+      homeTeamId: 'PHI',
+      awayTeamId: 'DAL',
+      startTime: '2026-09-13T17:00:00Z',
+      status,
+      homeScore: status === 'FINAL' ? 24 : undefined,
+      awayScore: status === 'FINAL' ? 17 : undefined,
+      spread: -3.5
+    };
+  }
+
+  function weekPick(weekId: string, userId: string, gameId: string, teamId: string): Pick {
+    return {
+      userId,
+      weekId,
+      gameId,
+      selectedTeamId: teamId,
+      confidence: ORDINARY_POINTS,
+      pointsEarned: ORDINARY_POINTS,
+      result: 'WIN'
+    };
+  }
+
+  // Week 1 is played out; week 2 still has a game to come.
+  const games = [
+    weekGame('week-2026-01', 'w1g1', 'FINAL'),
+    weekGame('week-2026-01', 'w1g2', 'FINAL'),
+    weekGame('week-2026-02', 'w2g1', 'FINAL'),
+    weekGame('week-2026-02', 'w2g2', 'SCHEDULED')
+  ];
+
+  it('keeps only the named member', () => {
+    const picks = [
+      weekPick('week-2026-01', 'me', 'w1g1', 'PHI'),
+      weekPick('week-2026-01', 'you', 'w1g2', 'DAL')
+    ];
+    expect(completedWeekPicks(picks, games, 'me').map(p => p.gameId)).toEqual(['w1g1']);
+  });
+
+  it('drops the week with a game still to play', () => {
+    const picks = [
+      weekPick('week-2026-01', 'me', 'w1g1', 'PHI'),
+      weekPick('week-2026-02', 'me', 'w2g1', 'PHI')
+    ];
+    expect(completedWeekPicks(picks, games, 'me').map(p => p.gameId)).toEqual(['w1g1']);
+  });
+
+  it('counts a week the moment its last game is final — not on the Tuesday after', () => {
+    // The bug: every game of week 2 is played and scored, and the pick on it
+    // must count NOW. Nothing here knows what day it is, which is the point.
+    const played = games.map(g =>
+      g.id === 'w2g2' ? weekGame('week-2026-02', 'w2g2', 'FINAL') : g
+    );
+    const picks = [
+      weekPick('week-2026-01', 'me', 'w1g1', 'PHI'),
+      weekPick('week-2026-02', 'me', 'w2g1', 'PHI')
+    ];
+    expect(completedWeekPicks(picks, played, 'me')).toHaveLength(2);
+  });
+
+  it('drops it for the signed-in member too — every column is measured alike', () => {
+    // There is no 'own picks' exemption: two members compared on this screen
+    // have to be counted over the same weeks.
+    const picks = [weekPick('week-2026-02', 'me', 'w2g1', 'PHI')];
+    expect(completedWeekPicks(picks, games, 'me')).toEqual([]);
+  });
+
+  it('does not count a final game that has no score yet', () => {
+    // sync-week writes status and score together and grades against both, so a
+    // final game with no score is one whose picks cannot have resolved.
+    const unscored = [
+      { ...weekGame('week-2026-01', 'w1g1', 'FINAL'), homeScore: undefined },
+      weekGame('week-2026-01', 'w1g2', 'FINAL')
+    ];
+    const picks = [weekPick('week-2026-01', 'me', 'w1g2', 'PHI')];
+    expect(completedWeekPicks(picks, unscored, 'me')).toEqual([]);
+  });
+
+  it('does not treat a week with no games as complete', () => {
+    // A week row exists days before its schedule is seeded. Nothing to be over
+    // is not the same as over.
+    const picks = [weekPick('week-2026-03', 'me', 'ghost', 'PHI')];
+    expect(completedWeekPicks(picks, games, 'me')).toEqual([]);
+  });
+});
 
 describe('computeTeamAffinity', () => {
   it('returns nothing when nothing has been picked', () => {

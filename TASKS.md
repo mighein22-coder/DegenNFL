@@ -306,6 +306,66 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ---
 
+## Done (affinity selector, 2026-09-22)
+
+- [x] **Team Affinity reads any member, not only the one signed in** (issue
+      #31). A `Member` selector beside the title, defaulting to yourself. The
+      table, the bye-week rule and the records column are untouched; whose
+      picks feed them is now a piece of state.
+
+      One load covers the league — picks, profiles and every week's games are
+      fetched once and the selector filters in memory, the same shape the
+      Matrix's week selector has. Flicking between members costs nothing.
+
+- [x] **Only completed weeks count, for everybody** — the condition Mike
+      attached to the selector, and the thing that makes it safe to offer.
+      `picks_select_visible` releases another member's picks a game at a time,
+      so on a Sunday morning their "season" here would be whichever fraction of
+      their sheet has kicked off: a real row, honestly fetched, and a false
+      picture of who they back.
+
+      **It applies to your own picks too.** Your in-flight week is complete in
+      the data, so leaving it in would make your numbers the one set on the
+      screen measured over a different span — and comparing members is the
+      entire reason the selector exists. My History still shows the week being
+      played in full, which is where it belongs.
+
+      The pending column survives this and still means something: `sync-week`
+      only runs when somebody opens a page, so a week can roll over with picks
+      on it not yet graded.
+
+- [x] **A week is over when its GAMES are over**, which is the second cut of
+      this and the one that works. `completedWeekIds()` in `affinity.ts`
+      calls a week complete once every game in it is FINAL with a score.
+
+      The first cut read "completed" off the **Tuesday 18:00 ET rollover**, and
+      Mike caught it the same day: week 2's Monday night game had finished and
+      been scored, everyone had read the results off the Matrix, and Affinity
+      still showed week 1 only — it was waiting for a calendar tick a full day
+      after the football had stopped. A week does not become complete because
+      the week after it starts.
+
+      Asking the games needs no calendar, no clock and no season, and it is the
+      same condition `sync-week` closes a week on (`weekLifecycle.ts`), so the
+      screen and the server agree on the word. `isWeekComplete()` in
+      `timezone.ts` is gone rather than left unused — it encoded the wrong
+      rule, and dead code that answers a live question wrongly is a trap.
+
+      A score is required as well as the status: `sync-week` writes the two
+      together and grades only against a game with both. A week with no games
+      is **not** complete — a week row exists days before its schedule is
+      seeded, and nothing to be over is not the same as over.
+
+- [x] `completedWeekPicks()` holds the member-and-week filter, so the rule is
+      testable without a database and the view stays a container. It needs the
+      whole slate of each week, not just the games picked, which is what
+      `getGamesForWeeks` already returns.
+
+- [x] 162 unit tests passing (6 new); `npm run build` and `npm run typecheck`
+      clean.
+
+---
+
 ## Done (matrix status, 2026-09-21)
 
 - [x] **The Matrix said "hidden" about picks it was already showing** (issue

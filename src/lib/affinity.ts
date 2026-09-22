@@ -29,6 +29,72 @@ export interface TeamAffinityRow {
 }
 
 /**
+ * The weeks whose football is over: every game in them final, with a score.
+ *
+ * THE CALENDAR IS NOT THE ANSWER, and reading it off one is what the first cut
+ * of this got wrong. It took "completed" from the Tuesday 18:00 ET rollover, so
+ * a week whose Monday night game had finished and been scored still did not
+ * count until the following evening — the screen sat a full day behind results
+ * every member had already seen on the Matrix.
+ *
+ * Asking the games instead needs no calendar, no clock and no season: a week is
+ * over when its last game is over, whenever that happens to be. It is also the
+ * same condition `sync-week` closes a week on (`weekLifecycle.ts`), so this
+ * screen and the server agree on what "completed" means.
+ *
+ * A SCORE is required as well as the FINAL status. `sync-week` writes the two
+ * together and grades picks only against a game that has both, so a final game
+ * without a score is one whose picks cannot have been resolved yet.
+ *
+ * A week with NO games is not complete. Nothing to be over is not the same as
+ * being over, and a week row exists from the moment somebody opens the app in
+ * it — days before its schedule is seeded.
+ */
+export function completedWeekIds(games: Game[]): Set<string> {
+  const weeks = new Set<string>();
+  const unfinished = new Set<string>();
+
+  for (const game of games) {
+    weeks.add(game.weekId);
+    if (game.status !== 'FINAL' || game.homeScore == null || game.awayScore == null) {
+      unfinished.add(game.weekId);
+    }
+  }
+
+  for (const weekId of unfinished) weeks.delete(weekId);
+  return weeks;
+}
+
+/**
+ * One member's picks, from the weeks that are actually over.
+ *
+ * WHY A WEEK IN FLIGHT IS NOT COUNTED. The screen reads any member, not just
+ * the one signed in, and other members' picks arrive a game at a time: RLS
+ * reveals each one at its own kickoff, and the Sunday 13:00 ET lock releases
+ * the rest. So on a Sunday morning another member's "season" is one
+ * Thursday-night pick — a real row, honestly fetched, and a completely false
+ * picture of who they back. Counting whole weeks only is what makes two members
+ * on this screen comparable.
+ *
+ * It applies to the signed-in member too, for the same reason: their own
+ * in-flight week is complete in the data, so leaving it in would make their
+ * numbers the one set on the screen that is measured differently. `My History`
+ * is where the week being played belongs, and it still shows all of it.
+ *
+ * `games` must be every game of the weeks being considered, not only the games
+ * picked — a week is judged by its whole slate. `getGamesForWeeks` returns
+ * exactly that.
+ */
+export function completedWeekPicks(
+  picks: Pick[],
+  games: Game[],
+  userId: string
+): Pick[] {
+  const complete = completedWeekIds(games);
+  return picks.filter(pick => pick.userId === userId && complete.has(pick.weekId));
+}
+
+/**
  * Sorted by how often the team was picked, then by wins, then by team id so the
  * order is stable across renders and between two members with identical rows.
  */

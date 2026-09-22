@@ -306,6 +306,51 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ---
 
+## Done (team records on the sheet, 2026-09-22)
+
+- [x] **Each pick card shows the team's own W-L in parentheses** (issue #33) —
+      "Eagles (2-0)" under the city, beside the line. It is the one number on
+      the card that is not about the pool: the line says what the book thinks,
+      the record says what the season says.
+
+      Fetched with the sheet and **swallowed to null on failure**. A member who
+      came to make five picks must not be stopped by a standings API, so the
+      parenthetical disappears and nothing else changes. No "(—)" placeholder:
+      that claims to know something the card does not.
+
+      No mapping layer. Every abbreviation ESPN returns is a key of `TEAMS`,
+      verified against the live endpoint — so a record is looked up by team id
+      directly, and there is nothing to drift.
+
+- [x] **The `team-records` cache window cut from an hour to five minutes.**
+      The hour was a default and it defeated the second half of #33: a member
+      could watch a game finish and still read the old record all afternoon.
+      Five minutes is short enough that a record follows a final within one
+      page visit and long enough that a sheet reloaded all Sunday does not
+      become an ESPN request per reload. Nothing in the response is
+      per-member, so a shared cache hit is as good as a fresh fetch.
+
+      What does NOT refresh a record: the reload after `sync-week`. It runs
+      seconds after the first fetch and is served from the browser cache. A
+      record moves on the next visit past the window, which is the same
+      "refreshes because somebody opened a page" model as the rest of the app.
+
+- [x] **The `TODO(spike)` on `team-records.ts` is resolved.** Its response
+      shape was the last one the ESPN spike never checked. Verified against
+      the live endpoint: the groups/children nesting is right, the walker
+      collects all 32 entries, and the parse is clean.
+
+- [x] **First component test in the repo** (`gameCard.test.tsx`, 5
+      assertions), and deliberately narrow: the whole content of #33 is
+      "show the record in parentheses", and nothing else in the suite would
+      notice it silently vanishing. `renderToStaticMarkup` — no new
+      dependency, no jsdom, no cleanup, and the requirement IS the markup.
+
+- [x] 167 unit tests passing (5 new); `npm run build` and `npm run typecheck`
+      clean.
+
+---
+
 ## Done (affinity selector, 2026-09-22)
 
 - [x] **Team Affinity reads any member, not only the one signed in** (issue

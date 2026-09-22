@@ -12,9 +12,19 @@ import type { Handler, HandlerResponse } from '@netlify/functions';
  * every pick a clear win or loss. The tie only shows up here, in the team's own
  * record.
  *
- * TODO(spike): the ESPN standings response shape is unverified — see
- * scripts/spike-espn.mjs and the note at the top of nfl-schedule.ts. The
- * groups/children nesting below is the reported shape, not an observed one.
+ * VERIFIED 2026-09-22 against the live endpoint: the groups/children nesting
+ * below is correct, the walker collects all 32 entries, and every abbreviation
+ * it returns is a key of `TEAMS` in src/constants.ts. That last point is what
+ * lets callers look a record up by team id with no mapping layer in between.
+ *
+ * THE CACHE WINDOW IS A PRODUCT DECISION, not a default. The pick sheet shows
+ * each team's record in parentheses and is expected to move when a game ends
+ * (issue #33), so an hour — what this used to send — meant a member could watch
+ * a game finish and still read the old record for the rest of the afternoon.
+ * Five minutes is short enough that a record follows a final within one page
+ * visit, and long enough that a sheet reloaded repeatedly on a Sunday does not
+ * turn into an ESPN request per reload. Nothing here is per-member, so a shared
+ * cache hit is as good as a fresh fetch.
  */
 
 const ESPN_STANDINGS =
@@ -67,7 +77,8 @@ const handler: Handler = async (): Promise<HandlerResponse> => {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=3600'
+        // See the cache note at the top of this file before widening this.
+        'Cache-Control': 'public, max-age=300'
       },
       body: JSON.stringify(records)
     };

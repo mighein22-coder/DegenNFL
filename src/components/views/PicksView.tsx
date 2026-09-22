@@ -81,6 +81,14 @@ interface PicksViewProps {
   myPicks: Pick[];
   /** Whose sheet this is. Printed; a sheet on paper with no name on it is anonymous. */
   memberName: string;
+  /**
+   * Team abbreviation -> "W-L", shown in parentheses on each card (issue #33).
+   *
+   * Passed straight through to `GameCard`. Null when the records fetch failed,
+   * which costs the parenthetical and nothing else — this screen is the one
+   * that must keep working when ESPN does not.
+   */
+  records?: Record<string, string> | null;
   saving?: boolean;
   onSave: (picks: PickSubmission[]) => void;
 }
@@ -95,6 +103,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
   games,
   myPicks,
   memberName,
+  records,
   saving,
   onSave
 }) => {
@@ -320,6 +329,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
                   selectedTeamId={entry?.selectedTeamId}
                   confidence={entry?.confidence}
                   locked={false}
+                  records={records}
                   onSelectTeam={teamId => selectTeam(game.id, teamId)}
                 />
 
@@ -382,6 +392,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
                   selectedTeamId={pick?.selectedTeamId}
                   confidence={pick?.confidence}
                   locked
+                  records={records}
                 />
 
                 {/* Same reason as the open section: on the printed record a

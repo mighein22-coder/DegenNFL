@@ -5,6 +5,7 @@ import {
   getCurrentWeek,
   getGamesForWeek,
   getMyPicksForWeek,
+  getTeamRecords,
   savePicks,
   syncWeek,
   type PickSubmission
@@ -37,6 +38,26 @@ import type { Profile } from '../../lib/supabase';
  * On mount it also fires `sync-week`, which is how scores land: nothing else in
  * the app is time-triggered between Tuesdays, so results appear because members
  * open a page. It runs AFTER first paint so the sheet is never waiting on ESPN.
+ *
+ * TEAM RECORDS ARE THE ONE OPTIONAL READ HERE (issue #33). Each card shows the
+ * team's own W-L in parentheses, which comes from ESPN via `team-records` and
+ * has nothing to do with the pool's own scoring. It is fetched alongside the
+ * sheet and a failure is swallowed to null, because a member who came here to
+ * make five picks must not be stopped by a standings API — the parenthetical
+ * disappears and the sheet is unchanged.
+ *
+ * WHEN A RECORD ACTUALLY MOVES, stated precisely because it is easy to assume
+ * more than is true. The reload after `sync-week` does NOT refresh the
+ * records: it runs seconds after the first fetch, so the browser serves the
+ * same cached response. What moves a record is the NEXT VISIT to this page
+ * once the cache window has passed — five minutes, see the note in
+ * `netlify/functions/team-records.ts`.
+ *
+ * That is the right behaviour rather than a shortcoming. The standings are
+ * ESPN's and change when ESPN says so, not when our sync writes a score, and
+ * this app has no clock of its own between Tuesdays: everything here refreshes
+ * because a member opened a page. A record is therefore at most five minutes
+ * behind the game that changed it, which is what issue #33 asked for.
  */
 
 interface PicksPageProps {
@@ -48,6 +69,8 @@ interface Loaded {
   games: Game[];
   /** This member's picks, and only theirs — see `getMyPicksForWeek`. */
   myPicks: Pick[];
+  /** Team abbreviation -> "W-L". Null when ESPN could not be reached. */
+  records: Record<string, string> | null;
 }
 
 export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
@@ -59,12 +82,16 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
 
   const load = useCallback(async (): Promise<Loaded> => {
     const week = await getCurrentWeek();
-    // Games and picks are independent reads; no reason to wait twice.
-    const [games, myPicks] = await Promise.all([
+    // Three independent reads; no reason to wait three times. The records one
+    // is caught rather than awaited bare: it is the only one of the three that
+    // leaves the page usable when it fails, so it must not reject the Promise
+    // .all and take the sheet down with it.
+    const [games, myPicks, records] = await Promise.all([
       getGamesForWeek(week.id),
-      getMyPicksForWeek(week.id, profile.id)
+      getMyPicksForWeek(week.id, profile.id),
+      getTeamRecords().catch(() => null)
     ]);
-    return { week, games, myPicks };
+    return { week, games, myPicks, records };
   }, [profile.id]);
 
   useEffect(() => {
@@ -132,7 +159,7 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
     return <div className="p-8 text-muted">Loading this week…</div>;
   }
 
-  const { week, games, myPicks } = data;
+  const { week, games, myPicks, records } = data;
 
   // Not open yet: the week exists but its schedule has not been captured.
   if (games.length === 0) {
@@ -214,6 +241,7 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
         games={games}
         myPicks={myPicks}
         memberName={profile.name}
+        records={records}
         saving={saving}
         onSave={handleSave}
       />

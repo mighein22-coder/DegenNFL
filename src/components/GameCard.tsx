@@ -23,6 +23,15 @@ import type { Game } from '../types';
  *      and the RLS policy both reject a pick on it, so offering the choice
  *      would only produce an error at submit time. That is derived here from
  *      the game itself rather than passed in, so no call site can forget it.
+ *   4. THE TEAM'S OWN RECORD, in parentheses after the nickname (issue #33).
+ *      It is the one number on the card that is not about the pool: the line
+ *      says what the book thinks, and "(2-0)" says what the season says.
+ *
+ *      It is OPTIONAL and silently absent. The records come from ESPN through
+ *      the `team-records` function, whose response shape is undocumented, so
+ *      the caller drops them on failure and every team here renders without a
+ *      parenthetical rather than with an empty one. A card that says
+ *      "Eagles (—)" claims to know something it does not.
  *
  * The card never splits across a page break. A game whose away team is at the
  * foot of one sheet and whose line is on the next is not a record of anything.
@@ -36,6 +45,15 @@ interface GameCardProps {
   confidence?: number;
   /** Closed to further change — kickoff has passed, or the week's final lock has. */
   locked: boolean;
+  /**
+   * Team abbreviation -> "W-L" (or "W-L-T"), as `getTeamRecords` returns it.
+   *
+   * Null when that fetch failed, which is a state the card is expected to
+   * render in rather than an error: the pick sheet does not depend on ESPN.
+   * The keys are `TEAMS` keys, which ARE the ESPN abbreviations — all 32 agree,
+   * so there is no mapping layer to drift.
+   */
+  records?: Record<string, string> | null;
   onSelectTeam?: (teamId: string) => void;
 }
 
@@ -44,6 +62,7 @@ export const GameCard: React.FC<GameCardProps> = ({
   selectedTeamId,
   confidence,
   locked,
+  records,
   onSelectTeam
 }) => {
   const home = TEAMS[game.homeTeamId];
@@ -56,6 +75,8 @@ export const GameCard: React.FC<GameCardProps> = ({
   const renderTeam = (teamId: string, isHome: boolean) => {
     const team = TEAMS[teamId];
     const picked = selectedTeamId === teamId;
+    // Absent unless we actually have it — see the note on the prop.
+    const record = records?.[teamId];
 
     return (
       <button
@@ -102,7 +123,17 @@ export const GameCard: React.FC<GameCardProps> = ({
           <span className="block truncate font-display text-lg leading-none">
             {team?.city ?? teamId}
           </span>
-          <span className="block truncate text-sm text-muted">{team?.name ?? ''}</span>
+          <span className="block truncate text-sm text-muted">
+            {team?.name ?? ''}
+            {record && (
+              // Tabular so the records line up down the column, and a
+              // non-breaking space so "(2-0)" can never wrap onto its own line
+              // away from the nickname it belongs to.
+              <span className="font-mono tabular-nums text-faint">
+                {'\u00A0'}({record})
+              </span>
+            )}
+          </span>
         </span>
         <span className="ml-auto font-mono text-sm tabular-nums text-muted">
           {game.spread == null ? '—' : formatSpread(game.spread, isHome)}

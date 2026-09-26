@@ -7,6 +7,11 @@ import React from 'react';
  * rather than a palette name. That is what lets this file be lifted into
  * FrozenDegenerates unchanged — see src/styles/tokens.shared.css. If you find
  * yourself reaching for `bg-green-500` or a raw hex, add a token instead.
+ *
+ * The one raw name is `text-white` on the FILLED variants, and it is correct
+ * there: it sits on a green or red fill in both display modes. Everywhere else
+ * text is `text-ink`, which turns brown-black in light mode — `text-white` on a
+ * surface would vanish into it.
  */
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -33,7 +38,7 @@ export const Button: React.FC<ButtonProps> = ({
     secondary:
       'bg-surface hover:bg-surface-raised text-ink border border-line focus:ring-brand-500',
     danger: 'bg-loss hover:opacity-90 text-white focus:ring-loss',
-    ghost: 'bg-transparent hover:bg-white/5 text-muted hover:text-ink'
+    ghost: 'bg-transparent hover:bg-ink/5 text-muted hover:text-ink'
   };
 
   const sizes = {

@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './styles/index.css';
+import { watchSystemTheme } from './lib/theme';
+
+// index.html has already applied the saved theme; this keeps "System" live.
+watchSystemTheme();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

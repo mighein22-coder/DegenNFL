@@ -43,7 +43,10 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({ name, avatar, size =
       // palette in print.css and prints near-white initials on a dark disc
       // that the browser then declines to paint. The member's name is always
       // beside it, and this is decorative — aria-hidden already says so.
-      className={`${dimensions} flex shrink-0 items-center justify-center rounded-full font-display tracking-wide text-ink print:hidden`}
+      //
+      // White, not `text-ink`: the disc is the same dark tint in both display
+      // modes, and ink turns brown-black in light mode.
+      className={`${dimensions} flex shrink-0 items-center justify-center rounded-full font-display tracking-wide text-white print:hidden`}
       style={{ backgroundColor: `oklch(0.4 0.08 ${hueFor(name)})` }}
     >
       {label}

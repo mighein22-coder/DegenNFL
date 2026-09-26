@@ -85,7 +85,7 @@ export const RedeemInviteView: React.FC<RedeemInviteViewProps> = ({
           </p>
         </div>
 
-        <div className="bg-surface/60 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-2xl">
+        <div className="bg-surface/60 backdrop-blur-xl border border-ink/10 p-8 rounded-2xl shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-muted mb-2">
@@ -98,7 +98,7 @@ export const RedeemInviteView: React.FC<RedeemInviteViewProps> = ({
                 placeholder="ABCD-EFGH-IJKL"
                 required
                 autoComplete="off"
-                className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
               />
               <p className="mt-1 text-xs text-faint">
                 Case, spaces and dashes do not matter.
@@ -115,7 +115,7 @@ export const RedeemInviteView: React.FC<RedeemInviteViewProps> = ({
                 onChange={e => setName(e.target.value)}
                 placeholder="How you appear in the standings"
                 required
-                className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
               />
             </div>
 

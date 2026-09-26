@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DegenNFL</title>
+    <script>
+      // Apply the saved display mode before first paint, so a light-mode
+      // member does not see a flash of the dark palette while the bundle
+      // loads. Mirrors resolveTheme() in lib/theme.ts — keep the two in step
+      // (lib/__tests__/theme.test.ts pins the storage key and the default).
+      (function () {
+        var pref = 'dark';
+        try { pref = localStorage.getItem('degennfl-theme') || 'dark'; } catch (e) {}
+        var light = pref === 'light' ||
+          (pref === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+        document.documentElement.dataset.theme = light ? 'light' : 'dark';
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

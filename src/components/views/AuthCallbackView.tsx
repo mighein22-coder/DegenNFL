@@ -137,15 +137,15 @@ export const AuthCallbackView: React.FC<AuthCallbackViewProps> = ({ onDone }) =>
 
       <div className="relative z-10 w-full max-w-md p-8">
         <div className="text-center mb-10">
-          <h1 className="font-display text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-brand-200 mb-2">
+          <h1 className="font-display text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-ink to-brand-200 mb-2">
             ICEPICK
           </h1>
         </div>
 
-        <div className="bg-surface/60 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-2xl">
+        <div className="bg-surface/60 backdrop-blur-xl border border-ink/10 p-8 rounded-2xl shadow-2xl">
           {phase.kind === 'working' && (
             <div className="flex flex-col items-center gap-4 py-4">
-              <div className="w-8 h-8 border-4 border-brand-500/20 border-t-ice-500 rounded-full animate-spin" />
+              <div className="w-8 h-8 border-4 border-brand-500/20 border-t-brand-500 rounded-full animate-spin" />
               <p className="text-muted text-sm">Verifying your link…</p>
             </div>
           )}
@@ -153,7 +153,7 @@ export const AuthCallbackView: React.FC<AuthCallbackViewProps> = ({ onDone }) =>
           {phase.kind === 'error' && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-white font-bold text-lg mb-2">Link no longer valid</h2>
+                <h2 className="text-ink font-bold text-lg mb-2">Link no longer valid</h2>
                 <p className="text-muted text-sm">{phase.message}</p>
                 <p className="text-muted text-xs mt-2">
                   Reset links can only be used once, and expire after a while.
@@ -168,7 +168,7 @@ export const AuthCallbackView: React.FC<AuthCallbackViewProps> = ({ onDone }) =>
           {phase.kind === 'confirmed' && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-white font-bold text-lg mb-2">Email confirmed</h2>
+                <h2 className="text-ink font-bold text-lg mb-2">Email confirmed</h2>
                 <p className="text-muted text-sm">Your account is ready.</p>
               </div>
               <Button className="w-full" size="lg" onClick={onDone}>
@@ -180,7 +180,7 @@ export const AuthCallbackView: React.FC<AuthCallbackViewProps> = ({ onDone }) =>
           {phase.kind === 'set-password' && (
             <form onSubmit={handleSetPassword} className="space-y-6">
               <div>
-                <h2 className="text-white font-bold text-lg mb-1">Choose a new password</h2>
+                <h2 className="text-ink font-bold text-lg mb-1">Choose a new password</h2>
                 <p className="text-muted text-xs">At least 8 characters.</p>
               </div>
 
@@ -195,7 +195,7 @@ export const AuthCallbackView: React.FC<AuthCallbackViewProps> = ({ onDone }) =>
                   onChange={e => setPassword(e.target.value)}
                   autoComplete="new-password"
                   required
-                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
                 />
               </div>
 
@@ -210,7 +210,7 @@ export const AuthCallbackView: React.FC<AuthCallbackViewProps> = ({ onDone }) =>
                   onChange={e => setConfirmPassword(e.target.value)}
                   autoComplete="new-password"
                   required
-                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
                 />
               </div>
 

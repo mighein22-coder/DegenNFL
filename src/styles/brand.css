@@ -34,3 +34,64 @@
   --text-muted: oklch(0.72 0.015 260);
   --text-faint: oklch(0.56 0.015 260);
 }
+
+/* --------------------------------------------------------------------------
+ * Light display mode — "game-day program" (issue #35)
+ *
+ * Selected by `<html data-theme="light">`, which lib/theme.ts sets from the
+ * member's choice in Settings (and index.html sets before first paint). Dark
+ * is the default and is the block above, untouched.
+ *
+ * A printed program rather than a screen: warm cream stock for the page,
+ * white cards, brown-black ink, pigskin-tan rules, deep turf green for the
+ * brand. The NHL app's light mode is cool ice-white; this is deliberately the
+ * opposite temperature, for the same reason the dark ramps differ.
+ *
+ * EVERY SLOT KEEPS ITS DARK-MODE ROLE, which is why no component carries a
+ * light-only class. The brand ramp is therefore inverted end for end, the same
+ * move print.css makes: 800/900 are only ever tint backgrounds (the picked
+ * side, your own row, the active nav item) and go pale; 300/400 are accent
+ * text and borders and go dark enough to read on white; 500 stays a filled
+ * button under white text.
+ *
+ * Screen only. print.css redefines these slots under `@media print` on plain
+ * `:root`, and `:root[data-theme]` would outrank it by specificity — so
+ * without this media query a light-mode member would print the screen palette
+ * instead of the paper one.
+ * ------------------------------------------------------------------------ */
+
+@media screen {
+  :root[data-theme='light'] {
+    color-scheme: light;
+
+    --brand-50: oklch(0.26 0.06 155);
+    --brand-100: oklch(0.3 0.07 155);
+    --brand-200: oklch(0.34 0.09 155);
+    --brand-300: oklch(0.38 0.1 155);
+    --brand-400: oklch(0.43 0.12 155);
+    --brand-500: oklch(0.48 0.13 155);
+    --brand-600: oklch(0.58 0.14 155);
+    --brand-700: oklch(0.72 0.11 155);
+    --brand-800: oklch(0.86 0.07 155);
+    --brand-900: oklch(0.88 0.08 155);
+
+    --surface-canvas: oklch(0.965 0.014 85);
+    --surface-base: oklch(0.995 0.004 85);
+    --surface-raised: oklch(0.945 0.02 80);
+    --surface-sunken: oklch(0.94 0.018 80);
+    --surface-line: oklch(0.84 0.03 70);
+
+    --text-primary: oklch(0.22 0.02 60);
+    --text-muted: oklch(0.42 0.025 60);
+    --text-faint: oklch(0.52 0.025 60);
+
+    /* Declared as literals in tokens.shared.css, so overridden by name — as
+       print.css does. The dark values are mid-lightness and wash out on
+       cream. Brick rather than fire-engine red for the loss. */
+    --color-win: oklch(0.5 0.14 150);
+    --color-loss: oklch(0.5 0.17 30);
+    --color-pending: oklch(0.55 0.02 60);
+
+    --shadow-card: 0 1px 2px oklch(0.3 0.03 60 / 0.08), 0 4px 12px oklch(0.3 0.03 60 / 0.06);
+  }
+}

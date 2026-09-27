@@ -104,7 +104,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
       {/* Login Card */}
       <div className="relative z-10 w-full max-w-md p-8">
         <div className="text-center mb-10">
-          <h1 className="font-display text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-brand-200 mb-2">
+          <h1 className="font-display text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-ink to-brand-200 mb-2">
             DEGEN NFL
           </h1>
           <p className="text-muted uppercase tracking-widest text-sm">
@@ -112,7 +112,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
           </p>
         </div>
 
-        <div className="bg-surface/60 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-2xl">
+        <div className="bg-surface/60 backdrop-blur-xl border border-ink/10 p-8 rounded-2xl shadow-2xl">
           {mode === 'login' ? (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
@@ -125,7 +125,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
-                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
                 />
               </div>
 
@@ -139,7 +139,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
                 />
               </div>
 
@@ -197,7 +197,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                   placeholder="ABCD-EFGH-IJKL"
                   required
                   autoComplete="off"
-                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
                 />
                 <p className="mt-1 text-xs text-faint">
                   Case, spaces and dashes do not matter.
@@ -214,7 +214,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="How you appear in the standings"
                   required
-                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
                 />
               </div>
 
@@ -228,7 +228,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
-                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
                 />
               </div>
 
@@ -243,7 +243,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                   placeholder="••••••••"
                   required
                   minLength={8}
-                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
                 />
               </div>
 
@@ -289,7 +289,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
-                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
+                  className="w-full bg-surface-sunken/60 border border-line rounded-card px-4 py-3 text-ink focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none placeholder:text-faint"
                 />
               </div>
 

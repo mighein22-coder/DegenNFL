@@ -306,6 +306,78 @@ Read `PLANNING.md` for why things are shaped the way they are.
 
 ---
 
+## Done (display mode, 2026-09-26)
+
+- [x] **Settings → Display mode: Dark (default), Light or System** (issue #35),
+      ported from FrozenDegenerates' light mode (its #33 / PR #36). Applies the
+      moment it is picked; System follows the device and switches with it.
+
+      **Saved per browser, not per account** — localStorage, key
+      `degennfl-theme`. It has to apply on the login screen before anybody is
+      signed in, it needs no migration, and putting it on `profiles` would
+      have meant widening the column-scoped grant for a colour. The cost is
+      that a member's phone and laptop keep separate settings.
+
+      An inline script in `index.html` applies the choice **before first
+      paint**, so a light-mode member gets no flash of dark while the bundle
+      loads. It repeats `resolveTheme()` from `lib/theme.ts` by hand, because
+      it runs before the bundle exists; `theme.test.ts` pins the storage key
+      and default so the two copies cannot drift apart silently.
+
+- [x] **The palette is "game-day program"**, Mike's pick from three
+      directions: cream page, white cards, brown-black ink, pigskin-tan rules,
+      deep turf green. Deliberately the opposite temperature to the NHL app's
+      cool ice-white light mode.
+
+      **Far less work than the NHL port**, which is worth knowing when the next
+      theme-shaped change comes along. FrozenDegenerates had to rewire every
+      Tailwind colour through a CSS variable first; here every component
+      already paints through the semantic slots, so light mode is one block of
+      raw values in `brand.css` and nothing else. `tokens.shared.css` is
+      untouched and still byte-identical between the repos. Each slot keeps its
+      dark-mode role, so the brand ramp is inverted end for end, the same move
+      `print.css` makes: 800/900 are only ever tint backgrounds and go pale,
+      and 300/400 are accent text and go dark.
+
+      **The light block is `@media screen` only, and that is load-bearing.**
+      `print.css` redefines the same slots on plain `:root`, and
+      `:root[data-theme='light']` outranks that by specificity. Without the
+      media query, a light-mode member would print the screen palette. This
+      was checked in the served CSS.
+
+- [x] **Raw `white` swept out of everything that is not a filled button.**
+      Login, redeem and password-reset inputs and headings were `text-white`,
+      which is white-on-cream in light mode. They are now `text-ink`
+      (L 0.97 against 1.0 in dark, so no visible change there). The
+      `MemberAvatar` disc went the other way, `text-ink` to `text-white`,
+      because its tint is fixed and ink turns dark. **Rule for new code:**
+      `text-white` only ever sits on a `brand-500` or `loss` fill.
+
+      Also fixed in passing: the password-reset spinner used `border-t-ice-500`,
+      a leftover from the NHL port. `ice` does not exist here, so the spinner's
+      coloured arc never rendered in either mode.
+
+- [x] 174 unit tests passing (7 new); `npm run build` and `npm run typecheck`
+      clean.
+
+- [ ] **Look at the signed-in screens in light mode on the deploy preview.**
+      What WAS seen, in a browser against fake data through the real
+      components: Settings, the sidebar, all four button variants, the
+      standings table, an error note, the pick sheet (open, locked, graded and
+      no-line cards), and the login screen. What was NOT seen: the Dashboard,
+      League Matrix, My History, Team Affinity and Admin, which need data a
+      local run still cannot load. The Matrix is the one to check first, since
+      it is the densest use of `win`/`loss` tints.
+
+      Also not observed: System switching **live**. The preview browser was
+      hidden, and a hidden page receives no media-query change events. A
+      reload resolved it correctly, and the live listener is unit-tested with
+      a simulated device. The login screen's bottom-right glow is still raw
+      `blue-900/20`; on cream it reads as a faint grey smudge. Left alone as
+      decoration, but it is the one raw colour remaining if it bothers anyone.
+
+---
+
 ## Done (team records on the sheet, 2026-09-22)
 
 - [x] **Each pick card shows the team's own W-L in parentheses** (issue #33) —

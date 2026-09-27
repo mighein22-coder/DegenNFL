@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
+import { Moon, Sun, Monitor } from 'lucide-react';
 import { Button } from '../Button';
 import { PageHeader } from '../Page';
 import { MemberAvatar } from '../MemberAvatar';
 import { updatePassword, updateProfile } from '../../lib/supabaseService';
 import type { Profile } from '../../lib/supabase';
+import {
+  getThemePreference,
+  setThemePreference,
+  type ThemePreference
+} from '../../lib/theme';
 
 /**
- * Name, avatar, password.
+ * Name, avatar, password — and display mode.
  *
  * WHAT IS NOT ON THIS SCREEN IS THE INTERESTING PART. `role` is shown and not
  * editable, and that is not a UI decision that could be worked around: the
@@ -22,6 +28,10 @@ import type { Profile } from '../../lib/supabase';
  * The two forms save independently. A failed password change must not discard a
  * name the member already typed, and a shared submit button would do exactly
  * that.
+ *
+ * Display mode is the odd one out: it is saved in this browser, not on the
+ * profile (see lib/theme.ts for why), and applies the moment it is picked, so
+ * it has no Save button at all.
  */
 
 interface SettingsViewProps {
@@ -40,10 +50,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   <section className="mx-auto max-w-2xl">
     <PageHeader
       title="Settings"
-      subtitle="Your name, your avatar and your password."
+      subtitle="Your name, your avatar, your password and how the app looks."
     />
 
     <ProfileForm profile={profile} onProfileUpdated={onProfileUpdated} />
+    <AppearancePicker />
     <PasswordForm />
 
     <div className="mt-6 rounded-card border border-line bg-surface p-6 text-sm text-muted">
@@ -141,6 +152,58 @@ const ProfileForm: React.FC<SettingsViewProps> = ({ profile, onProfileUpdated })
         Save profile
       </Button>
     </form>
+  );
+};
+
+const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Moon }[] = [
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'system', label: 'System', icon: Monitor }
+];
+
+const AppearancePicker: React.FC = () => {
+  const [preference, setPreference] = useState<ThemePreference>(getThemePreference);
+
+  const choose = (value: ThemePreference) => {
+    setThemePreference(value);
+    setPreference(value);
+  };
+
+  return (
+    <section className="mt-6 rounded-card border border-line bg-surface p-6">
+      <h2 className="font-display text-xl tracking-wide text-ink">Display mode</h2>
+      <p className="mt-1 text-sm text-muted">
+        Dark is the default. System follows your device, and switches when it does.
+      </p>
+
+      <div role="radiogroup" aria-label="Display mode" className="mt-5 grid grid-cols-3 gap-3">
+        {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+          const selected = preference === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => choose(value)}
+              className={`flex flex-col items-center gap-2 rounded-control border px-3 py-4 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+                selected
+                  ? 'border-brand-400 bg-brand-900/40 text-ink'
+                  : 'border-line bg-surface-sunken text-muted hover:bg-surface-raised hover:text-ink'
+              }`}
+            >
+              <Icon size={20} aria-hidden />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mt-4 text-sm text-faint">
+        Saved on this device only, so it also applies on the sign-in screen. Another
+        browser or phone keeps its own setting.
+      </p>
+    </section>
   );
 };
 

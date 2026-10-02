@@ -287,6 +287,116 @@ Read `PLANNING.md` for why things are shaped the way they are.
       disagree. It needs a database connection, which is why it does not exist
       yet — but the mismatch would silently move every deadline.
 
+## Mobile app
+
+Ported from FrozenDegenerates' plan (its PRs #44 and #45, both merged
+2026-09-29). Two phases: **Phase 1 is an installable PWA; after it ships we
+pause and get member feedback before deciding on Phase 2** (Capacitor store
+apps). The desktop layout must not change: every mobile change sits below the
+`md` breakpoint. One squash-merged PR per sub-phase, and Mike decides when each
+merges.
+
+**What differs from FrozenDegenerates.** Tailwind is already build-time (v4), so
+1A is only the fonts. A bottom nav already exists but is all 7-8 routes as tabs,
+with no safe area and **no sign-out on a phone**. There is a Dark/Light/System
+theme, so `theme-color` has to follow it, and the iOS status bar must stay
+`black` (`black-translucent` is white-on-cream in light mode). Reminders follow
+each game's real lock rather than a Saturday: **deadline-driven**, Mike's call
+2026-09-29. There is no `scheduled-sync`; `weekly-rollover` is the only cron.
+`psql` is not installed on the dev machine, so `./supabase/test/run.sh` has to be
+run elsewhere for 1D's migration.
+
+**Phase 1 — PWA**
+
+*1A. Foundation*
+- [ ] This plan in `TASKS.md`.
+- [ ] Inter and Teko self-hosted via `@fontsource`, imported from `index.tsx`
+      before `styles/index.css` (`print.css` must stay the last import there).
+      Check which Inter weights are actually used before taking all six.
+- [ ] Google Fonts tags out of `index.html`; the `transparenttextures.com` login
+      background (`LoginView.tsx`) replaced or dropped.
+- [ ] No visual change in dark, light and print; login renders with the network
+      Offline.
+
+*1B. Installable app*
+- [ ] `vite-plugin-pwa`, `registerType: 'prompt'`, manifest (dark canvas colour),
+      icons in `src/public/` (football on turf green, `scripts/make-icons.py`
+      ported from FD).
+- [ ] Service worker: precache the shell and the Latin fonts; Supabase and
+      `/.netlify/*` are **network-only** (FD's decision — a cached sheet could show
+      a member something other than what was saved).
+- [ ] iOS meta tags; **no** `viewport-fit=cover` until 1C's safe-area padding.
+- [ ] `PwaNotices`: update prompt, offline banner, iOS Add-to-Home-Screen hint
+      (`lib/pwa.ts` and its tests ported from FD).
+- [ ] `netlify.toml`: `no-cache` for `/sw.js` and the manifest.
+- [ ] Kill switch (`selfDestroying: true`) written up in `docs/OPERATIONS.md`
+      **before** this merges, and merged Tue/Wed, not mid-slate: the pool is live.
+
+*1C. Mobile-first UI (likely three PRs: shell, pick sheet, other screens)*
+- [ ] Bottom nav: four tabs plus **More** (Affinity, History, Settings, Admin,
+      **Sign out**). `NAV_ROUTES` stays the single source.
+- [ ] Safe-area insets; `min-w-0` on `main`; `dvh` for full-height screens.
+- [ ] Pick sheet: the sticky Save bar is hidden behind the bottom nav (both are
+      `fixed bottom-0`, only the nav has a z-index); save errors render off-screen
+      above the sheet; 1 pt / 3 pts control in place of the `<select>`; 44px
+      targets; a refetch must never reset the draft.
+- [ ] `Button` lets a passed `disabled` override `isLoading`, so a save can be
+      double-tapped. Fix with a test.
+- [ ] Matrix on a phone: the grid is `hidden md:block`; the card list has no
+      matchup label and omits unpicked/hidden games. Decide with Mike.
+- [ ] Standings and Team Affinity tables at 375px; Login/Redeem padding; input
+      attributes (`autoComplete`, `inputMode`, label `htmlFor`); the Admin spread
+      field needs a minus sign and iOS's decimal keypad has none.
+- [ ] Pull-to-refresh via `useLoader.reload` (`PicksPage` does not use it).
+- [ ] "ICEPICK" still on `AuthCallbackView`.
+
+*1D. Push reminders*
+- [ ] Migration `0005`: `push_subscriptions` (own rows only) and
+      `push_reminder_log` (service role only), in the `revoke all` + explicit-grant
+      house style, with assertions in `01_security.sql`.
+- [ ] VAPID keys. Only the public key may be `VITE_`-prefixed.
+- [ ] `push-handler.js` loaded through `workbox.importScripts` (the default worker
+      has no `push` handler).
+- [ ] Settings toggle "Remind me to make picks", off by default; iOS only once
+      installed.
+- [ ] `pick-reminders`, every 30 minutes: nudge ~3h before the next real deadline
+      (earliest of a game's kickoff and the Sunday 13:00 ET lock) for members whose
+      sheet is incomplete (`summarizeSheet`). Claim in `push_reminder_log` before
+      sending; prune on 404/410; nothing 22:00-07:00 ET.
+- [ ] Admin-only "send me a test notification" (iOS push is the shakiest part).
+
+*1E. Ship and verify*
+- [ ] Desktop regression, every screen, dark/light/print.
+- [ ] `npm run build`, `npm run typecheck`, `npm test`; installability check on a
+      deploy preview.
+- [ ] iPhone and Android, real devices.
+- [ ] `docs/OPERATIONS.md` (VAPID keys, cadence, kill switch).
+- [ ] Member install note: the installed iPhone app has separate storage from
+      Safari, and emailed links open in Safari, not the app. Needs the open
+      `/auth/callback` allowlist task above done first.
+
+**⏸ Pause — member feedback.** Are people installing it, does push arrive
+(especially on iOS), does the pick sheet feel right on a phone? Go / no-go on
+Phase 2.
+
+**Phase 2 — Capacitor store apps (only if approved; after FD's Phase 2)**
+- [ ] `@capacitor/core` + `cli`, `cap init` (`com.frozendegenerates.degennfl`,
+      to confirm), android and ios. iOS needs a Mac or a cloud build service.
+- [ ] Absolute API base for the three `/.netlify/functions/*` calls in
+      `supabaseService.ts`, CORS (with preflight and `Authorization`) on
+      `admin-activate-week`, `team-records` and `sync-week`; a public-origin
+      constant instead of `window.location.origin` in `LoginView`; Supabase
+      redirect allowlist; no service worker in the shell.
+- [ ] Universal Links / App Links routed into `lib/authRedirect.ts`, which
+      snapshots the URL at import time and so needs a re-read path.
+- [ ] Native push (FCM + APNs); splash, status bar, icons; session in
+      `@capacitor/preferences`; printing hidden or through the share sheet.
+- [ ] Store accounts (shared with FD), privacy policy, listings, a reviewer demo
+      account (accounts are invite-gated), TestFlight and Play internal testing,
+      release steps in `docs/OPERATIONS.md`.
+
+---
+
 ## Later
 
 - [ ] Automated score sync *during* the week. `weekly-rollover` now closes the

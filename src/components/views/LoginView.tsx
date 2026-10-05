@@ -96,7 +96,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 bg-canvas">
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-600/20 blur-[120px] rounded-full"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-900/20 blur-[120px] rounded-full"></div>
       </div>

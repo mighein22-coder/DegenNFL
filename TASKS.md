@@ -309,14 +309,26 @@ run elsewhere for 1D's migration.
 **Phase 1 — PWA**
 
 *1A. Foundation*
-- [ ] This plan in `TASKS.md`.
-- [ ] Inter and Teko self-hosted via `@fontsource`, imported from `index.tsx`
-      before `styles/index.css` (`print.css` must stay the last import there).
-      Check which Inter weights are actually used before taking all six.
-- [ ] Google Fonts tags out of `index.html`; the `transparenttextures.com` login
-      background (`LoginView.tsx`) replaced or dropped.
-- [ ] No visual change in dark, light and print; login renders with the network
-      Offline.
+- [x] ✅ This plan in `TASKS.md` (#37).
+- [x] ✅ Inter and Teko self-hosted via `@fontsource`, imported from `index.tsx`
+      before `styles/index.css` (`print.css` is still the last import there).
+      **Three Inter weights, two Teko, not all of them:** the UI only asks for
+      `font-normal`/`medium`/`bold`, so Inter 400/500/700 (the Google link served
+      six). Teko is 500 and 700 only. Teko 400 is deliberately absent — nothing
+      served one before, so a 400 request resolved to the 500 face, and importing
+      a 400 would have changed every heading. If a new weight class is ever used
+      (`font-semibold`, say), import its face too or it will be synthesised.
+- [x] ✅ Google Fonts tags out of `index.html`. The `transparenttextures.com`
+      login background (`LoginView.tsx`) is **dropped, not replaced**: a 5%-opacity
+      cube texture that needed an external request. It is the one deliberate
+      visual difference in this PR and is close to invisible.
+- [ ] No visual change. **Seen:** the login screen in dark, served from a
+      production build, with zero requests off the app's origin and the latin
+      Inter 400/500 and Teko 700 faces loaded. **Not seen:** light mode, print,
+      and any signed-in screen (no `.env.local`, so nothing past login loads
+      locally). Check the Matrix and Pick sheet, light and print, on the deploy
+      preview. Not done as an Offline-network reload either; that belongs to 1B,
+      once a service worker exists to make it meaningful.
 
 *1B. Installable app*
 - [ ] `vite-plugin-pwa`, `registerType: 'prompt'`, manifest (dark canvas colour),

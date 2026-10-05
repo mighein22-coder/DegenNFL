@@ -14,6 +14,20 @@
 [functions]
   directory = "netlify/functions"
 
+# The service worker and manifest must always be revalidated. If a browser
+# cached sw.js for a day, an installed app would not hear about a new version —
+# or about the kill switch (docs/OPERATIONS.md) — for a day. Hashed files under
+# /assets/ are immutable and cache normally.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

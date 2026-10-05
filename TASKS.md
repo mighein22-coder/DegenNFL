@@ -331,18 +331,49 @@ run elsewhere for 1D's migration.
       once a service worker exists to make it meaningful.
 
 *1B. Installable app*
-- [ ] `vite-plugin-pwa`, `registerType: 'prompt'`, manifest (dark canvas colour),
-      icons in `src/public/` (football on turf green, `scripts/make-icons.py`
-      ported from FD).
-- [ ] Service worker: precache the shell and the Latin fonts; Supabase and
-      `/.netlify/*` are **network-only** (FD's decision — a cached sheet could show
-      a member something other than what was saved).
-- [ ] iOS meta tags; **no** `viewport-fit=cover` until 1C's safe-area padding.
-- [ ] `PwaNotices`: update prompt, offline banner, iOS Add-to-Home-Screen hint
-      (`lib/pwa.ts` and its tests ported from FD).
-- [ ] `netlify.toml`: `no-cache` for `/sw.js` and the manifest.
-- [ ] Kill switch (`selfDestroying: true`) written up in `docs/OPERATIONS.md`
-      **before** this merges, and merged Tue/Wed, not mid-slate: the pool is live.
+- [x] ✅ `vite-plugin-pwa` (v2.0.0, with workbox 7.4), `registerType: 'prompt'`,
+      manifest (name "DegenNFL", standalone, `start_url`/`scope`/`id` `/`), icons
+      in `src/public/` (football on turf green, redrawn by
+      `scripts/make-icons.py`, ported from FD). The manifest carries the **dark**
+      canvas (`#0f141d`) since dark is the default mode.
+- [x] ✅ Service worker: precaches the shell, the icons and the **Latin** font
+      files only (24 entries, ~1 MB). Supabase and `/.netlify/*` are
+      **network-only**, not network-first (FD's decision — a cached sheet could
+      show a member something other than what was saved, and auth responses must
+      never be stored). The deep-link fallback excludes `/.netlify/`.
+- [x] ✅ iOS meta tags (`apple-mobile-web-app-*`, touch icon). The status bar is
+      `black`, not `black-translucent`: translucent is white text over the page,
+      invisible on the cream light theme. **No** `viewport-fit=cover` until 1C's
+      safe-area padding.
+- [x] ✅ **`theme-color` follows the display mode.** One tag, updated by
+      `applyTheme()` and the pre-paint script (`THEME_COLORS` in `lib/theme.ts`),
+      rather than `prefers-color-scheme` variants that would ignore the Settings
+      choice. `theme.test.ts` pins the copies in `index.html`.
+- [x] ✅ `PwaNotices`: update prompt (hourly re-check), offline banner (keys off
+      the browser's online flag, so a connected-but-no-internet network such as a
+      captive portal shows none), iOS Add-to-Home-Screen hint. `lib/pwa.ts` and its
+      7 tests ported from FD, storage key `degennfl-ios-install-hint-dismissed`.
+      Painted in semantic tokens, with `Button` for Reload.
+- [x] ✅ `netlify.toml`: `no-cache` for `/sw.js` and the manifest.
+- [x] ✅ Kill switch, **and it was tried**: `PWA_KILL_SWITCH=1` at build time
+      (a Netlify env var, not `VITE_`) emits a self-destroying worker. In headless
+      Chrome an installed copy unregistered itself and dropped its caches on the
+      next update check, and the page still rendered. Written up in
+      `docs/OPERATIONS.md`, with the Tue/Wed deploy rule: the pool is live.
+- [x] ✅ **Verified in real Chrome** (headless, over CDP, against a production
+      build with dummy Supabase values): the worker activates; no installability
+      errors; the manifest parses; a deep link loads offline from the cache with
+      Inter and Teko still rendering; the offline banner shows and clears; on a
+      second deploy the prompt appears and **waits**, the old bundle keeps
+      running, and Reload swaps to the new one; nothing from Supabase or the
+      functions is in the cache.
+      **Not verified:** a real phone (that is 1E); anything behind the login
+      (no `.env.local`); and the in-app Claude browser cannot register a service
+      worker at all, so use real Chrome for any further PWA checks.
+- [ ] **Look at it on the deploy preview.** The one visible change on a laptop
+      should be the tab icon, plus Chrome/Edge offering an install icon in the
+      address bar. The notices stack above the bottom nav on a phone; on the Pick
+      sheet that overlaps its sticky Save bar until 1C reworks the bar.
 
 *1C. Mobile-first UI (likely three PRs: shell, pick sheet, other screens)*
 - [ ] Bottom nav: four tabs plus **More** (Affinity, History, Settings, Admin,

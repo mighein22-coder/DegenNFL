@@ -27,6 +27,20 @@ export const DEFAULT_THEME_PREFERENCE: ThemePreference = 'dark';
 
 const LIGHT_QUERY = '(prefers-color-scheme: light)';
 
+/**
+ * The browser-chrome colour for each theme: --surface-canvas from brand.css as
+ * hex (a meta tag cannot read oklch). It paints the Android status bar and the
+ * installed-app title bar, so it has to follow the member's choice, not the
+ * device's — which is why this is one tag updated here rather than a pair of
+ * `media="(prefers-color-scheme)"` tags in index.html that would ignore the
+ * Settings choice. index.html repeats these by hand for first paint, and
+ * theme.test.ts pins the copy. Recompute both if the canvas token changes.
+ */
+export const THEME_COLORS: Record<Theme, string> = {
+  dark: '#0f141d',
+  light: '#f8f3e9'
+};
+
 export function parseThemePreference(value: string | null | undefined): ThemePreference {
   return value === 'light' || value === 'dark' || value === 'system'
     ? value
@@ -52,7 +66,9 @@ function systemPrefersLight(): boolean {
 }
 
 export function applyTheme(preference: ThemePreference = getThemePreference()): void {
-  document.documentElement.dataset.theme = resolveTheme(preference, systemPrefersLight());
+  const theme = resolveTheme(preference, systemPrefersLight());
+  document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[theme]);
 }
 
 export function setThemePreference(preference: ThemePreference): void {

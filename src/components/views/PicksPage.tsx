@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PicksView } from './PicksView';
 import { Button } from '../Button';
 import {
@@ -14,6 +14,7 @@ import { getWeekOpensAt, formatETTime, getTimeUntil } from '../../lib/timezone';
 import { findGamesWithoutLine } from '../../lib/missingLines';
 import type { Game, Pick, Week } from '../../types';
 import type { Profile } from '../../lib/supabase';
+import { useLoader } from '../../hooks/useLoader';
 
 /**
  * The pick sheet, wired to data.
@@ -74,8 +75,6 @@ interface Loaded {
 }
 
 export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
-  const [data, setData] = useState<Loaded | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -94,32 +93,22 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
     return { week, games, myPicks, records };
   }, [profile.id]);
 
+  // useLoader keeps the previous data on screen through a reload, which is
+  // what makes a refresh safe: the sheet (and PicksView's unsaved draft, which
+  // lives in its state and is seeded once) is never torn down for a refetch.
+  const { data, error, reload, mutate } = useLoader(load);
+
+  // Best effort, once per week id, after the sheet is already on screen: a
+  // failed sync is not a failed page. Then refetch, so the scores it wrote show.
+  const syncedWeekId = useRef<string | null>(null);
+  const weekId = data?.week.id;
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const first = await load();
-        if (cancelled) return;
-        setData(first);
-        setError(null);
-
-        // Best effort, after paint. A failed sync is not a failed page — the
-        // sheet the member came for is already on screen.
-        await syncWeek(first.week.id).catch(() => {});
-        if (cancelled) return;
-
-        const refreshed = await load();
-        if (!cancelled) setData(refreshed);
-      } catch (err: any) {
-        if (!cancelled) setError(err?.message ?? String(err));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [load]);
+    if (!weekId || syncedWeekId.current === weekId) return;
+    syncedWeekId.current = weekId;
+    void syncWeek(weekId)
+      .catch(() => {})
+      .then(reload);
+  }, [weekId, reload]);
 
   const handleSave = useCallback(
     async (picks: PickSubmission[]) => {
@@ -128,7 +117,7 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
       setSaveError(null);
       try {
         const saved = await savePicks(data.week.id, picks);
-        setData(current => (current ? { ...current, myPicks: saved } : current));
+        mutate(current => (current ? { ...current, myPicks: saved } : current));
         setSavedAt(new Date());
       } catch (err: any) {
         // save_picks raises messages written to be shown ("only one 3-point
@@ -139,16 +128,20 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
         setSaving(false);
       }
     },
-    [data]
+    [data, mutate]
   );
 
-  if (error) {
+  // Nothing on screen yet, so there is nothing to protect: the full-page
+  // failure. Once a sheet IS on screen a failed refetch must not replace it —
+  // that would unmount PicksView and throw away an unsaved draft — so it
+  // becomes the notice further down instead.
+  if (!data && error) {
     return (
       <section className="mx-auto max-w-3xl">
         <h1 className="font-display text-3xl tracking-wide text-ink">Weekly Picks</h1>
         <p className="mt-4 text-muted">Could not load this week.</p>
         <p className="mt-2 font-mono text-sm text-faint">{error}</p>
-        <Button className="mt-6" onClick={() => window.location.reload()}>
+        <Button className="mt-6" onClick={reload}>
           Try again
         </Button>
       </section>
@@ -219,20 +212,15 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
         </div>
       )}
 
-      {/* A failed save is a fact about the sheet being printed, not a
-          transient toast — it stays on the record, because a member holding a
-          printed sheet the pool rejected needs to be holding the rejection
-          too. `dirty` in PicksView prints the same warning from the other
-          direction; either one alone leaves a gap. */}
-      {saveError && (
-        <div className="mx-auto mb-4 max-w-3xl rounded-card border border-loss bg-surface-sunken p-4 text-sm text-ink">
-          {saveError}
-        </div>
-      )}
-
-      {savedAt && !saveError && !saving && (
-        <div className="mx-auto mb-4 max-w-3xl text-sm text-muted">
-          Saved {formatETTime(savedAt, 'h:mm a zzz')}.
+      {error && (
+        <div
+          role="alert"
+          className="mx-auto mb-4 flex max-w-3xl items-center justify-between gap-3 rounded-card border border-line bg-surface-sunken p-4 text-sm text-muted print:hidden"
+        >
+          <span>Could not refresh this week. Your picks on screen are untouched.</span>
+          <Button size="sm" variant="secondary" onClick={reload}>
+            Retry
+          </Button>
         </div>
       )}
 
@@ -243,6 +231,8 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
         memberName={profile.name}
         records={records}
         saving={saving}
+        saveError={saveError}
+        savedAt={savedAt}
         onSave={handleSave}
       />
     </>

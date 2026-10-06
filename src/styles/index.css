@@ -12,6 +12,15 @@
    The insets are 0 everywhere but a notched phone, so nothing else moves, and
    they are 0 on paper. Bottom and top are handled where they matter: the fixed
    bottom nav, and an opaque status bar that needs no top inset. */
+/* The phone bottom nav's height: 3.5rem of tabs, its 1px border and the home-bar
+   inset. Everything that has to clear the nav (the More sheet, the page's bottom
+   padding, the notices, the pick sheet's Save bar) reads this rather than
+   restating the number. It is the nav's own height, so Sidebar's `min-h-14` and
+   this must move together. */
+:root {
+  --mobile-nav-h: calc(3.5rem + 1px + env(safe-area-inset-bottom));
+}
+
 body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);

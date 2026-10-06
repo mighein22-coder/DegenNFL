@@ -79,9 +79,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, onSignOut }) => {
         )}
       </nav>
 
-      {/* Mobile. The sheet and the bar share one height (`3.5rem` tabs plus the
-          1px border, plus the home-bar inset); the sheet, the page's bottom
-          padding in App.tsx and PwaNotices all clear it by that amount. */}
+      {/* Mobile. Layers, low to high: the pick sheet's Save bar (z-10), the More
+          scrim (z-20), this nav (z-30, so More stays tappable to close), the
+          PWA notices (z-40). `--mobile-nav-h` (index.css) is the nav's height. */}
       {moreOpen && (
         <div className="fixed inset-0 z-20 md:hidden print:hidden" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-black/60" />
@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, onSignOut }) => {
             id="more-menu"
             role="menu"
             onClick={e => e.stopPropagation()}
-            className="absolute bottom-[calc(3.75rem+env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] rounded-card border border-line bg-surface-raised p-2 shadow-card"
+            className="absolute bottom-[calc(var(--mobile-nav-h)+0.25rem)] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] rounded-card border border-line bg-surface-raised p-2 shadow-card"
           >
             {more.map(route => (
               <NavLink

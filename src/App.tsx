@@ -138,12 +138,12 @@ const App: React.FC = () => {
     <div className="flex min-h-dvh">
       <Sidebar profile={profile} onSignOut={signOut} />
 
-      {/* The bottom padding clears the mobile nav (3.75rem plus the home-bar
-          inset, with a little air). It does not exist on paper, so without
+      {/* The bottom padding clears the mobile nav (--mobile-nav-h, with a
+          little air). It does not exist on paper, so without
           print:p-0 every printed page carries an inch of it. min-w-0 lets a
           wide table scroll inside its own wrapper: as a flex child, main
           would otherwise grow to the table's width and widen the page. */}
-      <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-8 md:pb-8 print:p-0">
+      <main className="min-w-0 flex-1 p-4 pb-[calc(var(--mobile-nav-h)+1.5rem)] md:p-8 md:pb-8 print:p-0">
         <Routes>
           {/* Past the guard above, `profile` is non-null — and a profile IS
               membership, so every screen below can take it as a given rather

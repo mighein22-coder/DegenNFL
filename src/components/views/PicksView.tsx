@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Button } from '../Button';
+import { ConfidencePicker } from '../ConfidencePicker';
 import { GameCard } from '../GameCard';
 import { PrintButton } from '../PrintButton';
 import {
@@ -90,6 +91,14 @@ interface PicksViewProps {
    */
   records?: Record<string, string> | null;
   saving?: boolean;
+  /**
+   * The last save's rejection, already worded for a member. Shown at the top of
+   * the sheet on a laptop and on paper, and beside the Save bar on a phone,
+   * where the top of the sheet is off-screen by the time the button is tapped.
+   */
+  saveError?: string | null;
+  /** When the last save landed. */
+  savedAt?: Date | null;
   onSave: (picks: PickSubmission[]) => void;
 }
 
@@ -105,6 +114,8 @@ export const PicksView: React.FC<PicksViewProps> = ({
   memberName,
   records,
   saving,
+  saveError,
+  savedAt,
   onSave
 }) => {
   const now = new Date();
@@ -185,8 +196,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
     return options;
   };
 
-  const setConfidence = (gameId: string, raw: string) => {
-    const value = raw === '' ? undefined : Number(raw);
+  const setConfidence = (gameId: string, value: number | undefined) => {
     setDraft(prev => {
       const existing = prev[gameId];
       if (!existing) return prev;
@@ -269,7 +279,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
   );
 
   return (
-    <section className="mx-auto max-w-3xl pb-24 print:max-w-none print:pb-0">
+    <section className="mx-auto max-w-3xl pb-40 md:pb-24 print:max-w-none print:pb-0">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-display text-4xl tracking-wide text-ink">
@@ -299,9 +309,36 @@ export const PicksView: React.FC<PicksViewProps> = ({
 
         <div className="flex shrink-0 items-center gap-2">
           <PrintButton label="Print sheet" />
-          {openGames.length > 0 && saveButton('md', 'print:hidden')}
+          {/* Below md the sticky bar at the foot is always on screen, and a
+              second Save in the header is one more thing to misread. A wrapper
+              rather than `hidden` on the button: the button's own `flex` would
+              tie with it. */}
+          {openGames.length > 0 && (
+            <div className="hidden md:block print:!hidden">{saveButton('md', '')}</div>
+          )}
         </div>
       </header>
+
+      {/* A failed save is a fact about the sheet being printed, not a
+          transient toast — it stays on the record, because a member holding a
+          printed sheet the pool rejected needs to be holding the rejection
+          too. `dirty` below prints the same warning from the other direction;
+          either one alone leaves a gap. Not shown on a phone: the bar carries
+          it there. */}
+      {saveError && (
+        <div
+          role="alert"
+          className="mb-4 hidden rounded-card border border-loss bg-surface-sunken p-4 text-sm text-ink md:block print:block"
+        >
+          {saveError}
+        </div>
+      )}
+
+      {savedAt && !saveError && !saving && (
+        <div className="mb-4 hidden text-sm text-muted md:block print:block">
+          Saved {formatETTime(savedAt, 'h:mm a zzz')}.
+        </div>
+      )}
 
       {/* The loudest thing on the printed page when it applies, and absent
           otherwise. `dirty` means the draft on screen differs from what
@@ -336,12 +373,25 @@ export const PicksView: React.FC<PicksViewProps> = ({
                 {/* The selector only appears once a side is chosen — points
                     with no team attached are not a pick. */}
                 {entry?.selectedTeamId ? (
-                  <label className="mt-2 flex items-center gap-2 px-1 text-sm text-muted print:font-bold">
-                    Worth
+                  <div className="mt-2 flex flex-wrap items-center gap-2 px-1 text-sm text-muted print:font-bold">
+                    <span>Worth</span>
+
+                    {/* Phones get two big buttons on a row of their own, below
+                        "Worth" and the not-counted hint (order-last); from md
+                        up the sheet keeps its select. */}
+                    <ConfidencePicker
+                      className="order-last basis-full"
+                      value={entry.confidence}
+                      offered={pointOptions(entry.confidence)}
+                      onChange={value => setConfidence(game.id, value)}
+                    />
                     <select
-                      className="rounded-control border border-line bg-surface px-2 py-1 text-ink print:hidden"
+                      aria-label="Points for this game"
+                      className="hidden rounded-control border border-line bg-surface px-2 py-1 text-ink md:block print:!hidden"
                       value={entry.confidence ?? ''}
-                      onChange={e => setConfidence(game.id, e.target.value)}
+                      onChange={e =>
+                        setConfidence(game.id, e.target.value === '' ? undefined : Number(e.target.value))
+                      }
                     >
                       <option value="">—</option>
                       {pointOptions(entry.confidence).map(c => (
@@ -365,7 +415,7 @@ export const PicksView: React.FC<PicksViewProps> = ({
                     {entry.confidence == null && (
                       <span className="text-faint">not counted until set</span>
                     )}
-                  </label>
+                  </div>
                 ) : (
                   /* Print only. A game left alone is part of the record — on
                      screen the empty card says so plainly enough, but on paper
@@ -408,8 +458,22 @@ export const PicksView: React.FC<PicksViewProps> = ({
         </div>
       )}
 
+      {/* Below md this is a bar pinned just above the bottom nav (`bottom` is
+          the nav's own height, z-10 sits under the nav and the More scrim), with
+          the save status beside the button, where the member is looking. From md
+          up it is the plain button at the foot of the sheet it always was. */}
       {openGames.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 border-t border-line bg-surface-sunken p-4 md:static md:mt-6 md:border-0 md:bg-transparent md:p-0 print:!hidden">
+        <div className="fixed inset-x-0 bottom-(--mobile-nav-h) z-10 border-t border-line bg-surface-sunken py-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:static md:mt-6 md:border-0 md:bg-transparent md:p-0 print:!hidden">
+          {saveError && (
+            <p role="alert" className="mb-2 text-sm text-loss md:hidden">
+              {saveError}
+            </p>
+          )}
+          {savedAt && !saveError && !saving && (
+            <p role="status" className="mb-2 text-center text-sm text-muted md:hidden">
+              Saved {formatETTime(savedAt, 'h:mm a zzz')}.
+            </p>
+          )}
           {saveButton('lg', 'w-full')}
         </div>
       )}

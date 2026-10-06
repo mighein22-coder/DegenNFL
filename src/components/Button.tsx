@@ -24,6 +24,7 @@ export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
   isLoading,
+  disabled,
   className = '',
   ...props
 }) => {
@@ -42,16 +43,21 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const sizes = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-5 py-2.5 text-base',
+    // 44px tall on a phone, the smallest target a thumb hits reliably; the
+    // desktop height is untouched.
+    sm: 'min-h-11 px-3 py-1.5 text-sm md:min-h-0',
+    md: 'min-h-11 px-5 py-2.5 text-base md:min-h-0',
     lg: 'px-8 py-3.5 text-lg font-bold'
   };
 
   return (
     <button
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
-      disabled={isLoading || props.disabled}
       {...props}
+      // After the spread, and a plain OR: a caller's `disabled={false}` must
+      // not switch off the loading lock. (It used to come first, so any passed
+      // `disabled` overwrote it and a save button stayed tappable mid-save.)
+      disabled={isLoading || disabled}
     >
       {isLoading ? (
         <span className="flex items-center gap-2">

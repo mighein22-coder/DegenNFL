@@ -394,19 +394,39 @@ run elsewhere for 1D's migration.
       the page's bottom padding, the More sheet and `PwaNotices`; the body is
       padded sideways in `index.css` for landscape notches. No top inset: the iOS
       status bar is opaque `black`. `min-w-0` on `main`; `min-h-dvh` for the shell
-      and the four full-page screens. Nav height is written as `3.75rem` in three
-      places (sheet, `main` padding, notices); **1C-b's Save bar will be a fourth.**
+      and the four full-page screens. The nav's height is one CSS variable,
+      `--mobile-nav-h` in `index.css` (sheet, `main` padding, notices and the
+      pick sheet's Save bar all read it); keep it in step with the nav's `min-h-14`.
       Seen in the browser pane at 375px and 1100px against a throwaway harness
       (the real shell needs Supabase): the sheet in dark and light, close on
       navigation/Escape/outside tap, and desktop with no mobile nav in the layout.
       **Not seen:** a real notch or home bar (Chrome reports zero insets), so
       the insets are unverified until 1E.
-- [ ] Pick sheet: the sticky Save bar is hidden behind the bottom nav (both are
-      `fixed bottom-0`, only the nav has a z-index); save errors render off-screen
-      above the sheet; 1 pt / 3 pts control in place of the `<select>`; 44px
-      targets; a refetch must never reset the draft.
-- [ ] `Button` lets a passed `disabled` override `isLoading`, so a save can be
-      double-tapped. Fix with a test.
+- [x] ✅ **1C-b (pick sheet).** The Save bar is pinned directly above the nav
+      (`bottom: var(--mobile-nav-h)`, z-10 under the nav and the More scrim;
+      measured flush, 0px gap), with side insets. The save error and "Saved"
+      render **inside the bar** on a phone, since the top of the sheet is
+      off-screen by then; on a laptop and on paper they stay at the top as
+      before (they moved from `PicksPage` into `PicksView` as `saveError` /
+      `savedAt` props, same place, now `role="alert"`). The header's second Save
+      button is hidden below `md`, since the bar is always on screen.
+- [x] ✅ **1 pt / 3 pts picker** (`ConfidencePicker`) below `md`, 44px, on a row of
+      its own. A value the week cannot hold is shown **disabled and labelled
+      "used"**, never offered; tapping the active value clears it. **Desktop keeps
+      the `<select>`** (decided with the plan's default; revisit if the preview
+      says otherwise). Neither prints.
+- [x] ✅ `Button` spread `{...props}` after `disabled`, so a passed `disabled` beat
+      `isLoading`; fixed, with a test that **fails on the old code**. `sm`/`md`
+      are 44px on a phone.
+- [x] ✅ `PicksPage` is on `useLoader` (gained `mutate`, for the post-save patch).
+      "Try again" is `reload()`, not a page reload. **A failed refetch with a
+      sheet already on screen is now a notice, not a replacement:** the old
+      `if (error)` would have unmounted `PicksView` and thrown away an unsaved
+      draft. The draft is still seeded once and never reset by a refetch.
+- [ ] **Left for the deploy preview:** `PwaNotices` (z-40) still stack over the Save
+      bar while one is showing (offline, update ready, iOS hint). All three are
+      transient, but "Reload" can sit on top of "Save picks". Moving the notices
+      to the top on a phone is the fix if it bothers anyone.
 - [ ] Matrix on a phone: the grid is `hidden md:block`; the card list has no
       matchup label and omits unpicked/hidden games. Decide with Mike.
 - [ ] Standings and Team Affinity tables at 375px; Login/Redeem padding; input

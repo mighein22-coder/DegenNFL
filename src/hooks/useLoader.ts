@@ -21,6 +21,11 @@ export interface LoaderState<T> {
   loading: boolean;
   /** Re-runs `load`. Keeps the previous data on screen until it resolves. */
   reload: () => void;
+  /**
+   * Replaces the loaded data without a fetch, for a screen that has just
+   * written and been handed the new state back (the pick sheet after a save).
+   */
+  mutate: (update: (current: T | null) => T | null) => void;
 }
 
 export function useLoader<T>(load: () => Promise<T>): LoaderState<T> {
@@ -54,5 +59,5 @@ export function useLoader<T>(load: () => Promise<T>): LoaderState<T> {
 
   const reload = useCallback(() => setReloadCount(count => count + 1), []);
 
-  return { data, error, loading, reload };
+  return { data, error, loading, reload, mutate: setData };
 }

@@ -383,6 +383,13 @@ run elsewhere for 1D's migration.
       unreachable. More closes on navigation, Escape and an outside tap, and
       lights up on a page inside it. The scrim sits below the nav (z-20 / z-30),
       so the More button stays tappable to close it.
+- [x] ✅ **A phone held sideways gets an icon rail, not the 14rem sidebar** (Mike,
+      on the preview: it was far too big). Landscape is wide enough for `md`, so it
+      showed the desktop sidebar and gave a quarter of an 844px screen to it. A
+      `short:` variant (`max-height: 30rem`, in `index.css`) narrows it to 56px with
+      icons only; labels stay as tooltips and for screen readers, the brand and
+      member name are hidden, and Sign out is an icon. Seen at 844x390 (8 routes +
+      Sign out fit) and 1100x800 (still 224px).
 - [x] ✅ Safe areas: `viewport-fit=cover` with `env(safe-area-inset-*)` on the nav,
       the page's bottom padding, the More sheet and `PwaNotices`; the body is
       padded sideways in `index.css` for landscape notches. No top inset: the iOS

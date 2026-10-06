@@ -13,6 +13,7 @@ Set in the Netlify dashboard, not in the repo.
 | `VITE_SUPABASE_URL` | client bundle | No — public by construction |
 | `VITE_SUPABASE_ANON_KEY` | client bundle | No — public by construction |
 | `SUPABASE_SERVICE_ROLE_KEY` | functions only | **Yes.** Never `VITE_`-prefixed. |
+| `PWA_KILL_SWITCH` | build only | No. Leave unset; `1` is the emergency stop for the service worker — see *The installed app*. |
 
 Anything prefixed `VITE_` is **inlined into the JavaScript every visitor
 downloads**. The NHL app shipped a `VITE_SYNC_WEEK_SECRET` this way, which meant
@@ -206,6 +207,42 @@ npm --prefix src ci && npm --prefix netlify/functions ci && npm --prefix src run
 Publish directory `src/dist`, functions from `netlify/functions`. The SPA
 fallback redirect in `netlify.toml` is what makes `/auth/callback` reachable —
 without it, password reset links dead-end.
+
+### The installed app (service worker)
+
+DegenNFL is an installable PWA (`vite-plugin-pwa`). The service worker
+**precaches the app shell only** — the JS, CSS, icons and the Latin Inter and
+Teko fonts, about 1 MB — so the app and any deep link open with no network.
+Supabase (`*.supabase.co`) and `/.netlify/functions/*` are **never cached**:
+standings and the pick sheet change in minutes, a cached copy could show a
+member something other than what was saved, and an auth response must never be
+stored. Picks stay online-only.
+
+**Updates never swap the app under someone.** The worker is `registerType:
+'prompt'`: after a deploy, an open or installed copy shows "A new version of
+DegenNFL is ready — Reload" and waits, so a member mid-pick never loses an
+unsaved sheet. Installed copies re-check hourly. `sw.js` and
+`manifest.webmanifest` are served `no-cache` (`netlify.toml`); a worker cached
+for a day would delay both updates and the kill switch below by a day.
+
+**Kill switch.** A service worker is the one change in this app that can leave
+every installed copy stuck on an old build, so there is a way to stop it
+without a code change. If a bad worker ships:
+
+1. In the Netlify dashboard, set `PWA_KILL_SWITCH=1` (build environment).
+2. Trigger a deploy (the same commit is fine — *Deploys → Trigger deploy*).
+3. Each installed copy picks up the new `sw.js` on its next update check
+   (within the hour, or on the next launch), and that worker **unregisters
+   itself and clears its caches**. The app then behaves as the plain website.
+4. Fix the cause, **unset the variable**, and deploy again. Left on, nobody
+   gets the PWA.
+
+It is deliberately not `VITE_`-prefixed: it is a build flag, not something the
+bundle should read.
+
+**Deploying a service-worker change:** do it Tuesday or Wednesday, not between
+Thursday night and Monday night. Thursday's game locks its own picks, and a
+stuck shell on a Sunday morning is the worst time to find out.
 
 ### Supabase auth configuration
 

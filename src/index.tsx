@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+import { PwaNotices } from './components/layout/PwaNotices';
 // Self-hosted, so the app renders offline and inside a native shell. Only the
 // weights the UI asks for: Inter 400/500/700 (font-normal/medium/bold) and
 // Teko 500/700. Teko 400 is deliberately NOT imported: nothing set a 400 face
@@ -28,6 +29,7 @@ ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <BrowserRouter>
       <App />
+      <PwaNotices />
     </BrowserRouter>
   </React.StrictMode>
 );

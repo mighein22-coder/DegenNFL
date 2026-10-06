@@ -2,19 +2,41 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- No viewport-fit=cover yet: that runs the page under the notch and home
+         bar, which needs safe-area padding on the fixed bottom nav first
+         (mobile 1C). -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DegenNFL</title>
+    <!-- Dark, to match the manifest and the default display mode; the script
+         below swaps it for the member's actual theme before first paint. -->
+    <meta name="theme-color" content="#0f141d" />
+    <meta name="description" content="DegenNFL: the NFL against-the-spread confidence pool." />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
+    <!-- iOS ignores most of the manifest, so it needs its own tags. The status
+         bar stays `black` rather than `black-translucent`: translucent draws
+         white status text over the page, which is invisible on the cream light
+         theme. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="DegenNFL" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <script>
       // Apply the saved display mode before first paint, so a light-mode
       // member does not see a flash of the dark palette while the bundle
       // loads. Mirrors resolveTheme() in lib/theme.ts — keep the two in step
-      // (lib/__tests__/theme.test.ts pins the storage key and the default).
+      // (lib/__tests__/theme.test.ts pins the storage key, the default and the
+      // theme-color values).
       (function () {
         var pref = 'dark';
         try { pref = localStorage.getItem('degennfl-theme') || 'dark'; } catch (e) {}
         var light = pref === 'light' ||
           (pref === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
         document.documentElement.dataset.theme = light ? 'light' : 'dark';
+        // Browser-chrome colour for the same theme (THEME_COLORS in lib/theme.ts).
+        var colors = { dark: '#0f141d', light: '#f8f3e9' };
+        var tag = document.querySelector('meta[name="theme-color"]');
+        if (tag) tag.setAttribute('content', colors[light ? 'light' : 'dark']);
       })();
     </script>
   </head>

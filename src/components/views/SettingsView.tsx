@@ -126,6 +126,7 @@ const ProfileForm: React.FC<SettingsViewProps> = ({ profile, onProfileUpdated })
         <span className="text-sm text-muted">Name</span>
         <input
           type="text"
+          autoComplete="name"
           value={name}
           maxLength={40}
           onChange={event => setName(event.target.value)}
@@ -137,6 +138,7 @@ const ProfileForm: React.FC<SettingsViewProps> = ({ profile, onProfileUpdated })
         <span className="text-sm text-muted">Avatar</span>
         <input
           type="text"
+          autoComplete="off"
           value={avatar}
           maxLength={4}
           placeholder="An emoji, or two letters"

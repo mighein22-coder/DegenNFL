@@ -14,6 +14,7 @@ import {
   type MissingLineRow
 } from '../../lib/missingLines';
 import { useLoader } from '../../hooks/useLoader';
+import { useRegisterRefresh } from '../../hooks/useRegisterRefresh';
 import { useNow } from '../../hooks/useNow';
 import { buildWeekId, formatETTime, getCurrentWeekNumber, getWeekOpensAt } from '../../lib/timezone';
 import { WEEK_COUNT } from '../../constants';
@@ -145,7 +146,15 @@ const MissingLineForm: React.FC<MissingLineFormProps> = ({ row, busy, onSet }) =
               </span>
               <input
                 type="text"
-                inputMode="decimal"
+                // Not `decimal`: iOS's decimal keypad has no minus key, and a
+                // line is signed. A text keyboard has one; the pattern keeps it
+                // to a signed half-point number (parseSpreadInput is the gate).
+                inputMode="text"
+                pattern="[+\-]?[0-9]*\.?[0-9]*"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={text}
                 placeholder="-3"
                 aria-label={`Line for ${row.matchup}, from ${row.game.homeTeamId}'s point of view`}
@@ -214,6 +223,7 @@ export const AdminView: React.FC = () => {
     [valid, weekNumber]
   );
   const games = useLoader(loadGames);
+  useRegisterRefresh(games.reload, games.loading);
   // Stable across renders (useLoader memoises it), unlike `games` itself —
   // which is a fresh object each render and would make every callback that
   // closes over it unstable.

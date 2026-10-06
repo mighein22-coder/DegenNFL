@@ -101,7 +101,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
       </div>
 
       {/* Login Card */}
-      <div className="relative z-10 w-full max-w-md p-8">
+      <div className="relative z-10 w-full max-w-md p-4 sm:p-8">
         <div className="text-center mb-10">
           <h1 className="font-display text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-ink to-brand-200 mb-2">
             DEGEN NFL
@@ -111,14 +111,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
           </p>
         </div>
 
-        <div className="bg-surface/60 backdrop-blur-xl border border-ink/10 p-8 rounded-2xl shadow-2xl">
+        <div className="bg-surface/60 backdrop-blur-xl border border-ink/10 p-5 sm:p-8 rounded-2xl shadow-2xl">
           {mode === 'login' ? (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-muted mb-2">
+                <label htmlFor="login-email" className="block text-sm font-medium text-muted mb-2">
                   Email Address
                 </label>
                 <input
+                  id="login-email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -129,10 +135,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-muted mb-2">
+                <label htmlFor="login-password" className="block text-sm font-medium text-muted mb-2">
                   Password
                 </label>
                 <input
+                  id="login-password"
+                  autoComplete="current-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -161,7 +169,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                       setError('');
                       setPassword('');
                     }}
-                    className="text-brand-400 hover:text-brand-300 underline"
+                    className="py-3.5 text-brand-400 hover:text-brand-300 underline sm:py-0"
                   >
                     Forgot password?
                   </button>
@@ -175,7 +183,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                       setError('');
                       setPassword('');
                     }}
-                    className="text-brand-400 hover:text-brand-300 underline"
+                    className="py-3.5 text-brand-400 hover:text-brand-300 underline sm:py-0"
                   >
                     Create your account
                   </button>
@@ -186,10 +194,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
           ) : mode === 'signup' ? (
             <form onSubmit={handleSignUp} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-muted mb-2">
+                <label htmlFor="signup-code" className="block text-sm font-medium text-muted mb-2">
                   Invite Code
                 </label>
                 <input
+                  id="signup-code"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
                   type="text"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
@@ -204,10 +216,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-muted mb-2">
+                <label htmlFor="signup-name" className="block text-sm font-medium text-muted mb-2">
                   Display Name
                 </label>
                 <input
+                  id="signup-name"
+                  autoComplete="name"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -218,10 +232,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-muted mb-2">
+                <label htmlFor="signup-email" className="block text-sm font-medium text-muted mb-2">
                   Email Address
                 </label>
                 <input
+                  id="signup-email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -232,10 +252,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-muted mb-2">
+                <label htmlFor="signup-password" className="block text-sm font-medium text-muted mb-2">
                   Password
                 </label>
                 <input
+                  id="signup-password"
+                  autoComplete="new-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -270,7 +292,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                     setError('');
                     setSignupMessage('');
                   }}
-                  className="text-brand-400 hover:text-brand-300 underline text-xs"
+                  className="py-3.5 text-brand-400 hover:text-brand-300 underline sm:py-0 text-xs"
                 >
                   Back to login
                 </button>
@@ -279,10 +301,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
           ) : (
             <form onSubmit={handleResetPassword} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-muted mb-2">
+                <label htmlFor="reset-email" className="block text-sm font-medium text-muted mb-2">
                   Email Address
                 </label>
                 <input
+                  id="reset-email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -317,7 +345,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onSignUp }) => {
                     setResetMessage('');
                     setEmail('');
                   }}
-                  className="text-brand-400 hover:text-brand-300 underline text-xs"
+                  className="py-3.5 text-brand-400 hover:text-brand-300 underline sm:py-0 text-xs"
                 >
                   Back to login
                 </button>

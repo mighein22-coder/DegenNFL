@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { EmptyNote, ErrorNote, LoadingNote, PageHeader } from '../Page';
 import { useLoader } from '../../hooks/useLoader';
+import { useRegisterRefresh } from '../../hooks/useRegisterRefresh';
 import {
   getAllPicks,
   getGamesForWeeks,
@@ -84,6 +85,7 @@ export const TeamStatsView: React.FC<TeamStatsViewProps> = ({ profile }) => {
   }, []);
 
   const { data, error, loading, reload } = useLoader(load);
+  useRegisterRefresh(reload, loading);
 
   // The signed-in member unless the selector says otherwise. Falling back to
   // them also covers a selected id that is no longer in the roster, which beats
@@ -176,7 +178,7 @@ export const TeamStatsView: React.FC<TeamStatsViewProps> = ({ profile }) => {
             <select
               value={member.id}
               onChange={event => setSelectedUserId(event.target.value)}
-              className="rounded-control border border-line bg-surface px-2 py-1.5 text-ink"
+              className="min-h-11 rounded-control border border-line bg-surface px-2 py-1.5 text-base text-ink md:min-h-0 md:text-sm"
             >
               {data.profiles.map(option => (
                 <option key={option.id} value={option.id}>
@@ -204,27 +206,27 @@ export const TeamStatsView: React.FC<TeamStatsViewProps> = ({ profile }) => {
         </EmptyNote>
       ) : (
         <div className="overflow-x-auto rounded-card border border-line bg-surface">
-          <table className="w-full min-w-[26rem] text-sm">
+          <table className="w-full text-sm sm:min-w-[26rem]">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-faint">
                 <th scope="col" className="py-2 pl-3 pr-3 font-normal">
                   Team
                 </th>
                 {data.records && (
-                  <th scope="col" className="py-2 pr-3 text-right font-normal">
+                  <th scope="col" className="hidden py-2 pr-3 text-right font-normal sm:table-cell">
                     Record
                   </th>
                 )}
-                <th scope="col" className="py-2 pr-3 text-right font-normal">
+                <th scope="col" className="whitespace-nowrap py-2 pr-3 text-right font-normal">
                   Picked
                 </th>
-                <th scope="col" className="py-2 pr-3 text-right font-normal">
+                <th scope="col" className="whitespace-nowrap py-2 pr-3 text-right font-normal">
                   W-L
                 </th>
-                <th scope="col" className="py-2 pr-3 text-right font-normal">
+                <th scope="col" className="whitespace-nowrap py-2 pr-3 text-right font-normal">
                   Cover
                 </th>
-                <th scope="col" className="py-2 pr-3 text-right font-normal">
+                <th scope="col" className="whitespace-nowrap py-2 pr-3 text-right font-normal">
                   Pts
                 </th>
               </tr>
@@ -234,7 +236,7 @@ export const TeamStatsView: React.FC<TeamStatsViewProps> = ({ profile }) => {
                 const team = TEAMS[row.teamId];
                 return (
                   <tr key={row.teamId} className="border-t border-line">
-                    <td className="py-2.5 pl-3 pr-3">
+                    <td className="w-full max-w-0 py-2.5 pl-3 pr-3 sm:w-auto sm:max-w-none">
                       <span className="flex items-center gap-2.5">
                         <span
                           aria-hidden
@@ -251,7 +253,7 @@ export const TeamStatsView: React.FC<TeamStatsViewProps> = ({ profile }) => {
                     </td>
 
                     {data.records && (
-                      <td className="py-2.5 pr-3 text-right font-mono tabular-nums text-muted">
+                      <td className="hidden py-2.5 pr-3 text-right font-mono tabular-nums text-muted sm:table-cell">
                         {data.records[row.teamId] ?? '—'}
                       </td>
                     )}
@@ -294,6 +296,11 @@ export const TeamStatsView: React.FC<TeamStatsViewProps> = ({ profile }) => {
         {isSelf
           ? 'Only teams you have picked appear.'
           : `Only teams ${member.name} has picked appear.`}{' '}
+        {data.records && (
+          <span className="sm:hidden">
+            Each team&rsquo;s own record is hidden on a narrow screen; it shows on the pick sheet.{' '}
+          </span>
+        )}
         Four to six teams are on a bye every week and each plays 17 games in 18,
         so a team missing from this list has not been backed — it is not a gap in
         the data. Cover is wins as a share of the picks already graded, and the

@@ -420,13 +420,46 @@ run elsewhere for 1D's migration.
       bar while one is showing (offline, update ready, iOS hint). All three are
       transient, but "Reload" can sit on top of "Save picks". Moving the notices
       to the top on a phone is the fix if it bothers anyone.
-- [ ] Matrix on a phone: the grid is `hidden md:block`; the card list has no
-      matchup label and omits unpicked/hidden games. Decide with Mike.
-- [ ] Standings and Team Affinity tables at 375px; Login/Redeem padding; input
-      attributes (`autoComplete`, `inputMode`, label `htmlFor`); the Admin spread
-      field needs a minus sign and iOS's decimal keypad has none.
-- [ ] Pull-to-refresh via `useLoader.reload` (`PicksPage` does not use it).
-- [ ] "ICEPICK" still on `AuthCallbackView`.
+- [x] ✅ **1C-c (other screens).** **Matrix on a phone: both, with a toggle**
+      (Mike's call): **Cards | Grid**, cards by default, remembered per browser
+      (`lib/matrixLayout.ts`, key `degennfl-matrix-layout`; storage may throw, and
+      is optional). Cards now carry a matchup label on every pick, count the blank
+      games ("4 of 5 games blank"; the footnote still says what blank means), and
+      **pin your own card first** with a "You" tag, a view of `members` rather than
+      a second sort, so the grid and everyone else stay in standings order. Grid is
+      the laptop's own, with its sticky Member column, scrolling inside its wrapper
+      (page width stays 375px). Neither the toggle nor the choice reaches `md` or
+      paper.
+- [x] ✅ Standings (`StandingsTable`) and Team Affinity at 375px: the name column
+      truncates (`w-full max-w-0` below `sm`) instead of widening the table, header
+      cells do not wrap, and **Affinity drops its Record column on phones** (a
+      note says so; the pick sheet carries records). Measured: no horizontal
+      scroll on either. Segment / scope pills and the week and member selects are
+      44px on a phone, and the selects are 16px so iOS does not zoom on focus.
+- [x] ✅ Login / Redeem / AuthCallback: outer padding `p-4 sm:p-8` and inner `p-5
+      sm:p-8`, so inputs are 301px wide at 375 (were 247). Every input has an
+      `id` tied to its label, `autoComplete` (`email`, `current-password`,
+      `new-password`, `name`), email gets `inputMode`/`autoCapitalize="none"`, and
+      the invite code gets `autoCapitalize="characters"`. Link buttons have a 44px
+      hit area. **"ICEPICK" on `AuthCallbackView` is "DEGEN NFL".**
+- [x] ✅ Admin spread field: `inputMode="text"` plus a signed-number `pattern`,
+      since iOS's decimal keypad has no minus key. `parseSpreadInput` is still the
+      gate. **Not seen on a real iOS keyboard.**
+- [x] ✅ **Pull-to-refresh** on every data screen (Dashboard, Picks, Matrix,
+      Standings, Affinity, History, Admin): a screen registers its `useLoader`
+      reload with `useRegisterRefresh`, and one gesture listener in the shell
+      (`PullToRefresh`) calls it. Only from the top of the page, only a clear
+      downward drag (a sideways table scroll is ignored), and never under the More
+      sheet. The old data stays on screen while it loads, so it is safe on the
+      pick sheet. **`overscroll-behavior-y: contain` switches off the browser's
+      own pull-to-refresh**, which on Android reloads the whole page and would
+      lose an unsaved sheet. Driven with synthetic touch events in the browser
+      pane: short pull no refresh, sideways ignored, long pull refreshes once and
+      the spinner clears when the load does, a pull while scrolled down is ignored.
+      **Not tried with a real finger.**
+- [ ] Left: Settings, History and Dashboard layouts at 375px were not reviewed in
+      this PR beyond their buttons, and session persistence on an installed iOS /
+      Android app is still a 1E check.
 
 *1D. Push reminders*
 - [ ] Migration `0005`: `push_subscriptions` (own rows only) and

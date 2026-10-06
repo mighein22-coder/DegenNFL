@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ErrorNote, LoadingNote, PageHeader } from '../Page';
 import { StandingsTable } from '../StandingsTable';
 import { useLoader } from '../../hooks/useLoader';
+import { useRegisterRefresh } from '../../hooks/useRegisterRefresh';
 import { getAllPicks, getProfiles } from '../../lib/supabaseService';
 import { computeStandings, mostRecentScoredWeekId } from '../../lib/standings';
 import { getSegments } from '../../lib/segments';
@@ -45,6 +46,7 @@ export const StandingsView: React.FC<StandingsViewProps> = ({ profile }) => {
   }, []);
 
   const { data, error, loading, reload } = useLoader(load);
+  useRegisterRefresh(reload, loading);
 
   const segments = useMemo(() => getSegments(), []);
 
@@ -84,7 +86,7 @@ export const StandingsView: React.FC<StandingsViewProps> = ({ profile }) => {
       type="button"
       onClick={() => setSegment(value)}
       className={[
-        'rounded-control border px-3 py-1.5 text-sm transition-colors',
+        'flex min-h-11 items-center rounded-control border px-3 py-1.5 text-sm transition-colors md:min-h-0',
         segment === value
           ? 'border-brand-400 bg-brand-900/40 text-ink'
           : 'border-line bg-surface text-muted hover:bg-surface-raised hover:text-ink'

@@ -4,6 +4,7 @@ import { isAuthCallback } from './lib/authRedirect';
 import { supabase } from './lib/supabase';
 import { useAuth } from './hooks/useAuth';
 import { Sidebar } from './components/layout/Sidebar';
+import { PullToRefresh } from './components/layout/PullToRefresh';
 import { PUBLIC_ROUTES } from './routes';
 
 import { LoginView } from './components/views/LoginView';
@@ -137,6 +138,7 @@ const App: React.FC = () => {
   return (
     <div className="flex min-h-dvh">
       <Sidebar profile={profile} onSignOut={signOut} />
+      <PullToRefresh />
 
       {/* The bottom padding clears the mobile nav (--mobile-nav-h, with a
           little air). It does not exist on paper, so without

@@ -72,7 +72,7 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
+      <div className="flex min-h-dvh items-center justify-center text-muted">
         Loading…
       </div>
     );
@@ -96,7 +96,7 @@ const App: React.FC = () => {
   // with "you are already a member", stranding them on it.
   if (profileError) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-8 text-center">
         <p className="text-ink">Could not load your account.</p>
         <p className="max-w-md font-mono text-sm text-faint">{profileError}</p>
         <div className="flex gap-3">
@@ -135,12 +135,15 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-dvh">
       <Sidebar profile={profile} onSignOut={signOut} />
 
-      {/* pb-20 clears the mobile bottom nav, which does not exist on paper —
-          without print:p-0 every printed page carries an inch of it. */}
-      <main className="flex-1 p-4 pb-20 md:p-8 md:pb-8 print:p-0">
+      {/* The bottom padding clears the mobile nav (3.75rem plus the home-bar
+          inset, with a little air). It does not exist on paper, so without
+          print:p-0 every printed page carries an inch of it. min-w-0 lets a
+          wide table scroll inside its own wrapper: as a flex child, main
+          would otherwise grow to the table's width and widen the page. */}
+      <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-8 md:pb-8 print:p-0">
         <Routes>
           {/* Past the guard above, `profile` is non-null — and a profile IS
               membership, so every screen below can take it as a given rather

@@ -13,7 +13,7 @@ import {
  * version is ready, the network is gone, and (iOS only) how to install.
  *
  * Rendered once, at the app root. They stack in one fixed column above the
- * mobile bottom nav (`bottom-[4.5rem]`; the nav is ~57px) and drop to the
+ * mobile bottom nav (the nav is 3.75rem plus the home-bar inset) and drop to the
  * corner on desktop. Never printed.
  *
  * Ported from FrozenDegenerates, repainted in this app's semantic tokens.
@@ -46,7 +46,7 @@ export const PwaNotices: React.FC = () => {
     'flex items-center gap-3 rounded-card border border-line bg-surface-raised px-4 py-3 text-sm text-ink shadow-card';
 
   return (
-    <div className="fixed left-3 right-3 bottom-[4.5rem] z-40 flex flex-col gap-2 md:left-auto md:right-4 md:bottom-4 md:w-96 print:hidden">
+    <div className="fixed left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex flex-col gap-2 md:left-auto md:right-4 md:bottom-4 md:w-96 print:hidden">
       {!online && (
         <div role="status" className={card}>
           <WifiOff size={18} className="shrink-0 text-muted" aria-hidden />

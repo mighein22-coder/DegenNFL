@@ -6,3 +6,18 @@
 @import './brand.css';
 @import './tokens.shared.css';
 @import './print.css';
+
+/* A phone held sideways: wide enough for the md layout, but short. Used to
+   shrink the desktop sidebar to an icon rail (Sidebar.tsx). 30rem is below any
+   laptop window anyone works in and above a landscape phone's 360-430px. */
+@custom-variant short (@media (max-height: 30rem));
+
+/* viewport-fit=cover (index.html) draws the page under the notch in landscape.
+   Pad the body sideways so every screen, signed in or not, stays clear of it.
+   The insets are 0 everywhere but a notched phone, so nothing else moves, and
+   they are 0 on paper. Bottom and top are handled where they matter: the fixed
+   bottom nav, and an opaque status bar that needs no top inset. */
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}

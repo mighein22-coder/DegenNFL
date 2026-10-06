@@ -376,9 +376,31 @@ run elsewhere for 1D's migration.
       sheet that overlaps its sticky Save bar until 1C reworks the bar.
 
 *1C. Mobile-first UI (likely three PRs: shell, pick sheet, other screens)*
-- [ ] Bottom nav: four tabs plus **More** (Affinity, History, Settings, Admin,
-      **Sign out**). `NAV_ROUTES` stays the single source.
-- [ ] Safe-area insets; `min-w-0` on `main`; `dvh` for full-height screens.
+- [x] ✅ **1C-a (shell).** Bottom nav: four tabs (Dashboard, Picks, Matrix,
+      Standings) plus **More** (Affinity, History, Settings, Admin, **Sign
+      out**). `NAV_ROUTES` stays the single source: a `primaryMobile` flag picks
+      the tabs and `splitNavRoutes()` does the split, tested so no route can be
+      unreachable. More closes on navigation, Escape and an outside tap, and
+      lights up on a page inside it. The scrim sits below the nav (z-20 / z-30),
+      so the More button stays tappable to close it.
+- [x] ✅ **A phone held sideways gets an icon rail, not the 14rem sidebar** (Mike,
+      on the preview: it was far too big). Landscape is wide enough for `md`, so it
+      showed the desktop sidebar and gave a quarter of an 844px screen to it. A
+      `short:` variant (`max-height: 30rem`, in `index.css`) narrows it to 56px with
+      icons only; labels stay as tooltips and for screen readers, the brand and
+      member name are hidden, and Sign out is an icon. Seen at 844x390 (8 routes +
+      Sign out fit) and 1100x800 (still 224px).
+- [x] ✅ Safe areas: `viewport-fit=cover` with `env(safe-area-inset-*)` on the nav,
+      the page's bottom padding, the More sheet and `PwaNotices`; the body is
+      padded sideways in `index.css` for landscape notches. No top inset: the iOS
+      status bar is opaque `black`. `min-w-0` on `main`; `min-h-dvh` for the shell
+      and the four full-page screens. Nav height is written as `3.75rem` in three
+      places (sheet, `main` padding, notices); **1C-b's Save bar will be a fourth.**
+      Seen in the browser pane at 375px and 1100px against a throwaway harness
+      (the real shell needs Supabase): the sheet in dark and light, close on
+      navigation/Escape/outside tap, and desktop with no mobile nav in the layout.
+      **Not seen:** a real notch or home bar (Chrome reports zero insets), so
+      the insets are unverified until 1E.
 - [ ] Pick sheet: the sticky Save bar is hidden behind the bottom nav (both are
       `fixed bottom-0`, only the nav has a z-index); save errors render off-screen
       above the sheet; 1 pt / 3 pts control in place of the `<select>`; 44px

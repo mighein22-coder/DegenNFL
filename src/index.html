@@ -2,10 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- No viewport-fit=cover yet: that runs the page under the notch and home
-         bar, which needs safe-area padding on the fixed bottom nav first
-         (mobile 1C). -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover runs the page edge to edge, under the home bar and
+         (in landscape) the notch. The bottom nav, the page's bottom padding and
+         the notices add env(safe-area-inset-*) to stay clear, and index.css
+         pads the body sideways. The status bar below is opaque, so nothing
+         needs a top inset. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>DegenNFL</title>
     <!-- Dark, to match the manifest and the default display mode; the script
          below swaps it for the member's actual theme before first paint. -->

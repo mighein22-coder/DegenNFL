@@ -322,13 +322,14 @@ run elsewhere for 1D's migration.
       login background (`LoginView.tsx`) is **dropped, not replaced**: a 5%-opacity
       cube texture that needed an external request. It is the one deliberate
       visual difference in this PR and is close to invisible.
-- [ ] No visual change. **Seen:** the login screen in dark, served from a
+- [x] ✅ No visual change. **Seen:** the login screen in dark, served from a
       production build, with zero requests off the app's origin and the latin
       Inter 400/500 and Teko 700 faces loaded. **Not seen:** light mode, print,
       and any signed-in screen (no `.env.local`, so nothing past login loads
       locally). Check the Matrix and Pick sheet, light and print, on the deploy
       preview. Not done as an Offline-network reload either; that belongs to 1B,
       once a service worker exists to make it meaningful.
+      **Mike checked the 1A deploy preview, 2026-10-06.**
 
 *1B. Installable app*
 - [x] ✅ `vite-plugin-pwa` (v2.0.0, with workbox 7.4), `registerType: 'prompt'`,
@@ -370,10 +371,11 @@ run elsewhere for 1D's migration.
       **Not verified:** a real phone (that is 1E); anything behind the login
       (no `.env.local`); and the in-app Claude browser cannot register a service
       worker at all, so use real Chrome for any further PWA checks.
-- [ ] **Look at it on the deploy preview.** The one visible change on a laptop
+- [x] ✅ **Look at it on the deploy preview.** The one visible change on a laptop
       should be the tab icon, plus Chrome/Edge offering an install icon in the
       address bar. The notices stack above the bottom nav on a phone; on the Pick
       sheet that overlaps its sticky Save bar until 1C reworks the bar.
+      **Mike checked the 1B deploy preview, 2026-10-06.**
 
 *1C. Mobile-first UI (likely three PRs: shell, pick sheet, other screens)*
 - [x] ✅ **1C-a (shell).** Bottom nav: four tabs (Dashboard, Picks, Matrix,
@@ -423,10 +425,11 @@ run elsewhere for 1D's migration.
       sheet already on screen is now a notice, not a replacement:** the old
       `if (error)` would have unmounted `PicksView` and thrown away an unsaved
       draft. The draft is still seeded once and never reset by a refetch.
-- [ ] **Left for the deploy preview:** `PwaNotices` (z-40) still stack over the Save
+- [x] ✅ **Left for the deploy preview:** `PwaNotices` (z-40) still stack over the Save
       bar while one is showing (offline, update ready, iOS hint). All three are
       transient, but "Reload" can sit on top of "Save picks". Moving the notices
       to the top on a phone is the fix if it bothers anyone.
+      **Mike checked the 1C previews, 2026-10-06; no change to the notices was asked for.**
 - [x] ✅ **1C-c (other screens).** **Matrix on a phone: both, with a toggle**
       (Mike's call): **Cards | Grid**, cards by default, remembered per browser
       (`lib/matrixLayout.ts`, key `degennfl-matrix-layout`; storage may throw, and
@@ -487,7 +490,8 @@ run elsewhere for 1D's migration.
 - [ ] Desktop regression, every screen, dark/light/print.
 - [ ] `npm run build`, `npm run typecheck`, `npm test`; installability check on a
       deploy preview.
-- [ ] iPhone and Android, real devices.
+- [x] ✅ iPhone and Android, real devices.
+      **Mike tested on various devices, 2026-10-06 (which ones was not recorded).**
 - [ ] `docs/OPERATIONS.md` (VAPID keys, cadence, kill switch).
 - [ ] Member install note: the installed iPhone app has separate storage from
       Safari, and emailed links open in Safari, not the app. Needs the open

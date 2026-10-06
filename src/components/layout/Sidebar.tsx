@@ -39,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, onSignOut }) => {
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     [
-      'flex items-center gap-3 rounded-control px-3 py-2 text-sm transition-colors',
+      'flex items-center gap-3 rounded-control px-3 py-2 text-sm transition-colors short:justify-center short:px-0',
       isActive ? 'bg-brand-900/50 text-ink' : 'text-muted hover:bg-surface hover:text-ink'
     ].join(' ');
 
@@ -47,9 +47,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, onSignOut }) => {
     <>
       {/* Desktop. `print:!hidden` carries the important marker deliberately:
           a printed page is wider than the md breakpoint, so `md:flex` is live
-          at print time and the two variants would otherwise be a coin toss. */}
-      <nav className="hidden w-56 shrink-0 flex-col border-r border-line bg-surface-sunken p-4 md:flex print:!hidden">
-        <div className="mb-6 px-3">
+          at print time and the two variants would otherwise be a coin toss.
+
+          `short:` (index.css) is a phone turned sideways: wide enough to reach
+          md, but under 30rem tall. The 14rem rail would take a quarter of the
+          screen there, so it shrinks to an icon rail; the labels stay as
+          tooltips and for screen readers. A laptop is never that short. */}
+      <nav className="hidden w-56 shrink-0 flex-col border-r border-line bg-surface-sunken p-4 md:flex short:w-14 short:p-2 print:!hidden">
+        <div className="mb-6 px-3 short:hidden">
           <span className="font-display text-2xl tracking-wide text-brand-400">
             DegenNFL
           </span>
@@ -57,23 +62,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ profile, onSignOut }) => {
 
         <div className="flex flex-1 flex-col gap-1">
           {routes.map(route => (
-            <NavLink key={route.path} to={route.path} end={route.path === '/'} className={linkClass}>
+            <NavLink
+              key={route.path}
+              to={route.path}
+              end={route.path === '/'}
+              className={linkClass}
+              title={route.label}
+            >
               <route.icon size={18} aria-hidden />
-              {route.label}
+              <span className="short:sr-only">{route.label}</span>
             </NavLink>
           ))}
         </div>
 
         {profile && (
-          <div className="mt-4 border-t border-line pt-4">
-            <p className="truncate px-3 text-sm text-ink">{profile.name}</p>
+          <div className="mt-4 border-t border-line pt-4 short:mt-2 short:pt-2">
+            <p className="truncate px-3 text-sm text-ink short:hidden">{profile.name}</p>
             <button
               type="button"
               onClick={onSignOut}
-              className="mt-1 flex w-full items-center gap-3 rounded-control px-3 py-2 text-sm text-muted transition-colors hover:bg-surface hover:text-ink"
+              title="Sign out"
+              className="mt-1 flex w-full items-center gap-3 rounded-control px-3 py-2 text-sm text-muted transition-colors hover:bg-surface hover:text-ink short:justify-center short:px-0"
             >
               <LogOut size={18} aria-hidden />
-              Sign out
+              <span className="short:sr-only">Sign out</span>
             </button>
           </div>
         )}

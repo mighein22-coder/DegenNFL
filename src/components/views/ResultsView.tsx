@@ -4,6 +4,7 @@ import { MemberAvatar } from '../MemberAvatar';
 import { PickChip } from '../PickChip';
 import { PrintButton } from '../PrintButton';
 import { useLoader } from '../../hooks/useLoader';
+import { useRegisterRefresh } from '../../hooks/useRegisterRefresh';
 import { useNow } from '../../hooks/useNow';
 import {
   getAllPicks,
@@ -16,6 +17,7 @@ import { computeStandings } from '../../lib/standings';
 import { getSegmentForWeekId } from '../../lib/segments';
 import { getCurrentWeekNumber, isPickLocked } from '../../lib/timezone';
 import { matrixColumnStatus } from '../../lib/matrixColumn';
+import { readMatrixLayout, writeMatrixLayout, type MatrixLayout } from '../../lib/matrixLayout';
 import { TEAMS } from '../../constants';
 import type { Profile } from '../../lib/supabase';
 import type { Game, Pick, Week } from '../../types';
@@ -85,6 +87,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
   const now = useNow();
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [sortScope, setSortScope] = useState<SortScope>('WEEK');
+  // Phones only: a card per member, or the laptop's grid scrolling sideways.
+  const [layout, setLayoutState] = useState<MatrixLayout>(() => readMatrixLayout());
+  const setLayout = (next: MatrixLayout) => {
+    setLayoutState(next);
+    writeMatrixLayout(next);
+  };
 
   const load = useCallback(async (): Promise<Loaded> => {
     const [weeks, picks, profiles] = await Promise.all([
@@ -97,6 +105,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
   }, []);
 
   const { data, error, loading, reload } = useLoader(load);
+  useRegisterRefresh(reload, loading);
 
   // Weeks that actually have a schedule. A week row exists from the moment
   // somebody opens the app in it, days before its games are seeded, and an
@@ -177,6 +186,14 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
       .filter((p): p is Profile => p != null);
   }, [data, week, sortScope, segmentNumber]);
 
+  // The phone cards pin the signed-in member first, so their own row is never a
+  // scroll away. This is a view of `members`, not a second ordering rule: the
+  // grid, and everybody else's cards, stay in standings order.
+  const cardMembers = useMemo(() => {
+    const mine = members.find(member => member.id === profile.id);
+    return mine ? [mine, ...members.filter(member => member.id !== profile.id)] : members;
+  }, [members, profile.id]);
+
   const weekTotal = (userId: string): number => {
     const byGame = picksByUser.get(userId);
     if (!byGame) return 0;
@@ -239,7 +256,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
       onClick={() => setSortScope(value)}
       aria-pressed={sortScope === value}
       className={[
-        'rounded-control border px-3 py-1.5 text-sm transition-colors',
+        'flex min-h-11 items-center rounded-control border px-3 py-1.5 text-sm transition-colors md:min-h-0',
         sortScope === value
           ? 'border-brand-400 bg-brand-900/40 text-ink'
           : 'border-line bg-surface text-muted hover:bg-surface-raised hover:text-ink'
@@ -274,7 +291,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
               <select
                 value={week.id}
                 onChange={event => setSelectedWeekId(event.target.value)}
-                className="rounded-control border border-line bg-surface px-2 py-1.5 text-ink"
+                className="min-h-11 rounded-control border border-line bg-surface px-2 py-1.5 text-base text-ink md:min-h-0 md:text-sm"
               >
                 {[...playedWeeks]
                   .sort((a, b) => b.weekNumber - a.weekNumber)
@@ -299,9 +316,43 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
         points, then wins, then fewest losses.
       </p>
 
-      {/* Desktop, and paper. `print:!block` and `print:overflow-visible` are
-          both load-bearing — see the note at the top of the file. */}
-      <div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block print:!block print:overflow-visible print:rounded-none">
+      {/* Phones only: which of the two layouts to show. The grid is the laptop's
+          own, so it is here for the member who wants every game side by side and
+          does not mind scrolling for it. */}
+      <div
+        role="group"
+        aria-label="Matrix layout"
+        className="mb-4 flex gap-2 md:hidden print:!hidden"
+      >
+        {(['cards', 'grid'] as MatrixLayout[]).map(option => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={layout === option}
+            onClick={() => setLayout(option)}
+            className={[
+              'flex min-h-11 flex-1 items-center justify-center rounded-control border px-3 text-sm transition-colors',
+              layout === option
+                ? 'border-brand-400 bg-brand-900/40 text-ink'
+                : 'border-line bg-surface text-muted active:bg-surface-raised'
+            ].join(' ')}
+          >
+            {option === 'cards' ? 'Cards' : 'Grid'}
+          </button>
+        ))}
+      </div>
+
+      {/* The laptop's grid, and paper's. On a phone it is shown only when the
+          member has picked the Grid layout; `md:block` and `print:!block` make it
+          unconditional everywhere else, so neither can be hidden by the choice.
+          `print:!block` and `print:overflow-visible` are both load-bearing — see
+          the note at the top of the file. */}
+      <div
+        className={[
+          layout === 'grid' ? 'block' : 'hidden',
+          'overflow-x-auto rounded-card border border-line bg-surface md:block print:!block print:overflow-visible print:rounded-none'
+        ].join(' ')}
+      >
         <table className="w-full text-sm print:text-[9px]">
           <thead>
             <tr className="text-left text-xs text-faint">
@@ -376,51 +427,76 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
         </table>
       </div>
 
-      {/* Mobile: the grid does not fit, so it becomes a card per member. Never
-          on paper — the grid is the whole point of this screen, and printing
-          both would double every sheet. */}
-      <div className="space-y-3 md:hidden print:!hidden">
-        {members.map(member => {
-          const byGame = picksByUser.get(member.id);
-          const made = games.map(game => byGame?.get(game.id)).filter(Boolean) as Pick[];
+      {/* Mobile cards. Never on paper — the grid is the whole point of this
+          screen, and printing both would double every sheet. Your own card is
+          first. Each pick says which game it is on, because a bare "PHI ×3"
+          does not, and the blank games are counted rather than dropped, so a
+          member can tell a short sheet from a hidden one with the note below. */}
+      {layout === 'cards' && (
+        <div className="space-y-3 md:hidden print:!hidden">
+          {cardMembers.map(member => {
+            const byGame = picksByUser.get(member.id);
+            const isMe = member.id === profile.id;
+            const made = games.filter(game => byGame?.has(game.id));
+            const blank = games.length - made.length;
 
-          return (
-            <div
-              key={member.id}
-              className={[
-                'rounded-card border border-line p-4',
-                member.id === profile.id ? 'bg-brand-900/30' : 'bg-surface'
-              ].join(' ')}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex min-w-0 items-center gap-2">
-                  <MemberAvatar name={member.name} avatar={member.avatar} size="sm" />
-                  <span className="truncate text-ink">{member.name}</span>
-                </span>
-                <span className="font-mono tabular-nums text-ink">
-                  {weekTotal(member.id)}
-                </span>
-              </div>
-
-              {made.length === 0 ? (
-                <p className="mt-3 text-sm text-faint">Nothing visible yet.</p>
-              ) : (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {made.map(pick => (
-                    <PickChip
-                      key={pick.gameId}
-                      pick={pick}
-                      label={
-                        TEAMS[pick.selectedTeamId]?.abbreviation ?? pick.selectedTeamId
-                      }
-                    />
-                  ))}
+            return (
+              <div
+                key={member.id}
+                className={[
+                  'rounded-card border border-line p-4',
+                  isMe ? 'bg-brand-900/30' : 'bg-surface'
+                ].join(' ')}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <MemberAvatar name={member.name} avatar={member.avatar} size="sm" />
+                    <span className="truncate text-ink">{member.name}</span>
+                    {isMe && (
+                      <span className="shrink-0 rounded-full border border-brand-400/60 px-2 text-[11px] text-brand-400">
+                        You
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-mono tabular-nums text-ink">
+                    {weekTotal(member.id)}
+                  </span>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+
+                {made.length === 0 ? (
+                  <p className="mt-3 text-sm text-faint">Nothing visible yet.</p>
+                ) : (
+                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
+                    {made.map(game => {
+                      const pick = byGame!.get(game.id)!;
+                      return (
+                        <div key={game.id} className="flex flex-col items-start gap-1">
+                          <span className="text-[11px] text-faint">
+                            {TEAMS[game.awayTeamId]?.abbreviation ?? game.awayTeamId} @{' '}
+                            {TEAMS[game.homeTeamId]?.abbreviation ?? game.homeTeamId}
+                          </span>
+                          <PickChip
+                            pick={pick}
+                            label={
+                              TEAMS[pick.selectedTeamId]?.abbreviation ?? pick.selectedTeamId
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {made.length > 0 && blank > 0 && (
+                  <p className="mt-3 text-xs text-faint">
+                    {blank} of {games.length} {games.length === 1 ? 'game' : 'games'} blank
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Both reveal rules, because only saying the first one made the grid
           look broken every Monday: it reveals on kickoff OR on the Sunday

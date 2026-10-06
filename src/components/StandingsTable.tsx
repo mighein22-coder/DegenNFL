@@ -47,7 +47,9 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
       ].join(' ')}
     >
       <td className="py-2.5 pl-3 pr-2 font-mono tabular-nums text-muted">{row.rank}</td>
-      <td className="py-2.5 pr-3">
+      {/* `w-full max-w-0` below sm lets the name column take what the numbers
+          leave and truncate, instead of widening the table past the screen. */}
+      <td className="w-full max-w-0 py-2.5 pr-3 sm:w-auto sm:max-w-none">
         <span className="flex items-center gap-2.5">
           <MemberAvatar name={row.name} avatar={row.avatar} size="sm" />
           <span className="truncate text-ink">{row.name}</span>
@@ -74,7 +76,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
 
   return (
     <div className="overflow-x-auto rounded-card border border-line bg-surface">
-      <table className="w-full min-w-[22rem] text-sm">
+      <table className="w-full text-sm sm:min-w-[22rem]">
         <thead>
           <tr className="text-left text-xs uppercase tracking-wider text-faint">
             <th scope="col" className="py-2 pl-3 pr-2 font-normal">
@@ -83,18 +85,18 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
             <th scope="col" className="py-2 pr-3 font-normal">
               Member
             </th>
-            <th scope="col" className="py-2 pr-3 text-right font-normal">
+            <th scope="col" className="whitespace-nowrap py-2 pr-3 text-right font-normal">
               Pts
             </th>
-            <th scope="col" className="py-2 pr-3 text-right font-normal">
+            <th scope="col" className="whitespace-nowrap py-2 pr-3 text-right font-normal">
               W-L
             </th>
             {!compact && (
               <>
-                <th scope="col" className="py-2 pr-3 text-right font-normal">
+                <th scope="col" className="whitespace-nowrap py-2 pr-3 text-right font-normal">
                   Season
                 </th>
-                <th scope="col" className="py-2 pr-3 text-right font-normal">
+                <th scope="col" className="whitespace-nowrap py-2 pr-3 text-right font-normal">
                   {weeklyLabel ?? 'Week'}
                 </th>
               </>

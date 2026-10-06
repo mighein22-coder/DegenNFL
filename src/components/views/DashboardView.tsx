@@ -6,6 +6,7 @@ import { EmptyNote, ErrorNote, LoadingNote, PageHeader } from '../Page';
 import { PickChip } from '../PickChip';
 import { StandingsTable } from '../StandingsTable';
 import { useLoader } from '../../hooks/useLoader';
+import { useRegisterRefresh } from '../../hooks/useRegisterRefresh';
 import { useNow } from '../../hooks/useNow';
 import {
   getAllPicks,
@@ -78,6 +79,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ profile }) => {
   }, []);
 
   const { data, error, loading, reload } = useLoader(load);
+  useRegisterRefresh(reload, loading);
 
   // Best effort, once per week id, after the page is already on screen. A
   // failed sync is not a failed page.

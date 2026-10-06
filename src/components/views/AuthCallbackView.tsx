@@ -135,14 +135,14 @@ export const AuthCallbackView: React.FC<AuthCallbackViewProps> = ({ onDone }) =>
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-600/20 blur-[120px] rounded-full" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-900/20 blur-[120px] rounded-full" />
 
-      <div className="relative z-10 w-full max-w-md p-8">
+      <div className="relative z-10 w-full max-w-md p-4 sm:p-8">
         <div className="text-center mb-10">
           <h1 className="font-display text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-ink to-brand-200 mb-2">
-            ICEPICK
+            DEGEN NFL
           </h1>
         </div>
 
-        <div className="bg-surface/60 backdrop-blur-xl border border-ink/10 p-8 rounded-2xl shadow-2xl">
+        <div className="bg-surface/60 backdrop-blur-xl border border-ink/10 p-5 sm:p-8 rounded-2xl shadow-2xl">
           {phase.kind === 'working' && (
             <div className="flex flex-col items-center gap-4 py-4">
               <div className="w-8 h-8 border-4 border-brand-500/20 border-t-brand-500 rounded-full animate-spin" />

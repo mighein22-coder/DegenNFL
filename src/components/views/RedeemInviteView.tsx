@@ -74,7 +74,7 @@ export const RedeemInviteView: React.FC<RedeemInviteViewProps> = ({
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-600/20 blur-[120px] rounded-full" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md p-8">
+      <div className="relative z-10 w-full max-w-md p-4 sm:p-8">
         <div className="text-center mb-8">
           <h1 className="font-display text-4xl tracking-wide text-ink mb-2">
             One more step
@@ -85,13 +85,17 @@ export const RedeemInviteView: React.FC<RedeemInviteViewProps> = ({
           </p>
         </div>
 
-        <div className="bg-surface/60 backdrop-blur-xl border border-ink/10 p-8 rounded-2xl shadow-2xl">
+        <div className="bg-surface/60 backdrop-blur-xl border border-ink/10 p-5 sm:p-8 rounded-2xl shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-muted mb-2">
+              <label htmlFor="redeem-code" className="block text-sm font-medium text-muted mb-2">
                 Invite Code
               </label>
               <input
+                id="redeem-code"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
                 type="text"
                 value={inviteCode}
                 onChange={e => setInviteCode(e.target.value)}
@@ -106,10 +110,12 @@ export const RedeemInviteView: React.FC<RedeemInviteViewProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted mb-2">
+              <label htmlFor="redeem-name" className="block text-sm font-medium text-muted mb-2">
                 Display Name
               </label>
               <input
+                id="redeem-name"
+                autoComplete="name"
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
@@ -134,7 +140,7 @@ export const RedeemInviteView: React.FC<RedeemInviteViewProps> = ({
               <button
                 type="button"
                 onClick={onSignOut}
-                className="mt-2 text-brand-400 hover:text-brand-300 underline"
+                className="mt-2 py-3.5 text-brand-400 hover:text-brand-300 underline sm:py-0"
               >
                 Sign out
               </button>

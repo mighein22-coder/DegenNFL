@@ -15,6 +15,7 @@ import { findGamesWithoutLine } from '../../lib/missingLines';
 import type { Game, Pick, Week } from '../../types';
 import type { Profile } from '../../lib/supabase';
 import { useLoader } from '../../hooks/useLoader';
+import { useRegisterRefresh } from '../../hooks/useRegisterRefresh';
 
 /**
  * The pick sheet, wired to data.
@@ -96,7 +97,8 @@ export const PicksPage: React.FC<PicksPageProps> = ({ profile }) => {
   // useLoader keeps the previous data on screen through a reload, which is
   // what makes a refresh safe: the sheet (and PicksView's unsaved draft, which
   // lives in its state and is seeded once) is never torn down for a refetch.
-  const { data, error, reload, mutate } = useLoader(load);
+  const { data, error, loading, reload, mutate } = useLoader(load);
+  useRegisterRefresh(reload, loading);
 
   // Best effort, once per week id, after the sheet is already on screen: a
   // failed sync is not a failed page. Then refetch, so the scores it wrote show.

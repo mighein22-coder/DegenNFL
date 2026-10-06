@@ -30,3 +30,12 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
+
+/* No browser pull-to-refresh. On Android it reloads the whole page, which would
+   throw away an unsaved pick sheet; PullToRefresh draws its own and only
+   re-fetches. `contain` also keeps a scroll that reaches the end from chaining
+   into the browser. */
+html,
+body {
+  overscroll-behavior-y: contain;
+}

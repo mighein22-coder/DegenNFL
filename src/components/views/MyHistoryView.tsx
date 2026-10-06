@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { EmptyNote, ErrorNote, LoadingNote, PageHeader } from '../Page';
 import { useLoader } from '../../hooks/useLoader';
+import { useRegisterRefresh } from '../../hooks/useRegisterRefresh';
 import { getAllPicks, getGamesForWeeks } from '../../lib/supabaseService';
 import { buildHistory, type HistoryPick, type WeekHistory } from '../../lib/history';
 import { formatSpread } from '../../lib/scoring';
@@ -49,6 +50,7 @@ export const MyHistoryView: React.FC<MyHistoryViewProps> = ({ profile }) => {
   }, [profile.id]);
 
   const { data, error, loading, reload } = useLoader(load);
+  useRegisterRefresh(reload, loading);
 
   const history = useMemo(
     () => (data ? buildHistory(data.picks, data.games) : []),

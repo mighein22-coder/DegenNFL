@@ -14,6 +14,7 @@ import { RedeemInviteView } from './components/views/RedeemInviteView';
 import { DashboardView } from './components/views/DashboardView';
 import { StandingsView } from './components/views/StandingsView';
 import { ResultsView } from './components/views/ResultsView';
+import { GamePicksView } from './components/views/GamePicksView';
 import { TeamStatsView } from './components/views/TeamStatsView';
 import { MyHistoryView } from './components/views/MyHistoryView';
 import { SettingsView } from './components/views/SettingsView';
@@ -153,6 +154,7 @@ const App: React.FC = () => {
           <Route path="/" element={<DashboardView profile={profile} />} />
           <Route path="/picks" element={<PicksPage profile={profile} />} />
           <Route path="/matrix" element={<ResultsView profile={profile} />} />
+          <Route path="/matrix/game/:gameId?" element={<GamePicksView profile={profile} />} />
           <Route path="/affinity" element={<TeamStatsView profile={profile} />} />
           <Route path="/standings" element={<StandingsView profile={profile} />} />
           <Route path="/history" element={<MyHistoryView profile={profile} />} />

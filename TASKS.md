@@ -144,10 +144,10 @@ Read `PLANNING.md` for why things are shaped the way they are.
       first, the Matrix's own reveal rule. An unrevealed game is greyed in the
       picker with when it opens, and a direct link to one says so rather than
       rendering a tally of one. Because every game it can show is locked, the
-      **No pick** list is complete. 11 new unit tests (218 total). **Not run
-      against a real Supabase** — there is still no `.env.local` — so the screen
-      itself, and the tap-through from the Matrix on a phone, have not been seen
-      with data. Check them on the deploy preview once a week has revealed games.
+      **No pick** list is complete. 11 new unit tests (218 total). Not run
+      locally against a real Supabase (there is still no `.env.local`), but
+      Mike checked it on the deploy preview with real data on 2026-10-13 and it
+      worked as intended.
 
 - [x] Wire `/picks`. `PicksPage` is the container; `PicksView` stays pure.
       Covers both non-error empty states: a week whose schedule is not captured

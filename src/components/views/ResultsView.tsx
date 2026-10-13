@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { EmptyNote, ErrorNote, LoadingNote, PageHeader } from '../Page';
 import { MemberAvatar } from '../MemberAvatar';
 import { PickChip } from '../PickChip';
@@ -17,6 +18,7 @@ import { computeStandings } from '../../lib/standings';
 import { getSegmentForWeekId } from '../../lib/segments';
 import { getCurrentWeekNumber, isPickLocked } from '../../lib/timezone';
 import { matrixColumnStatus } from '../../lib/matrixColumn';
+import { gameAvailability } from '../../lib/gamePicks';
 import { readMatrixLayout, writeMatrixLayout, type MatrixLayout } from '../../lib/matrixLayout';
 import { TEAMS } from '../../constants';
 import type { Profile } from '../../lib/supabase';
@@ -278,6 +280,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
         actions={
           <>
             <PrintButton label="Print matrix" />
+            <Link
+              to="/matrix/game"
+              className="flex min-h-11 items-center rounded-control border border-line bg-surface px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-raised hover:text-ink md:min-h-0 print:hidden"
+            >
+              Game picks
+            </Link>
             {/* Screen only. On paper the caption below names the scope in
                 words, which reads better than a highlighted button. */}
             <span className="flex flex-wrap items-center gap-2 print:hidden">
@@ -471,10 +479,26 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ profile }) => {
                       const pick = byGame!.get(game.id)!;
                       return (
                         <div key={game.id} className="flex flex-col items-start gap-1">
-                          <span className="text-[11px] text-faint">
-                            {TEAMS[game.awayTeamId]?.abbreviation ?? game.awayTeamId} @{' '}
-                            {TEAMS[game.homeTeamId]?.abbreviation ?? game.homeTeamId}
-                          </span>
+                          {/* Your own pick on a game that has not opened is on
+                              your card too; that label is not a link. */}
+                          {(() => {
+                            const label = (
+                              <>
+                                {TEAMS[game.awayTeamId]?.abbreviation ?? game.awayTeamId} @{' '}
+                                {TEAMS[game.homeTeamId]?.abbreviation ?? game.homeTeamId}
+                              </>
+                            );
+                            return gameAvailability(week.weekNumber, game, now).revealed ? (
+                              <Link
+                                to={`/matrix/game/${game.id}`}
+                                className="flex min-h-6 items-center text-[11px] text-faint underline decoration-line underline-offset-2"
+                              >
+                                {label}
+                              </Link>
+                            ) : (
+                              <span className="text-[11px] text-faint">{label}</span>
+                            );
+                          })()}
                           <PickChip
                             pick={pick}
                             label={
@@ -533,9 +557,21 @@ const GameColumnHeader: React.FC<{ game: Game; weekNumber: number; now: Date }> 
 
   return (
     <span className="block whitespace-nowrap">
-      <span className="block font-display text-sm tracking-wide text-ink">
-        {away} @ {home}
-      </span>
+      {/* A game whose picks are not public yet is not a link: the screen it
+          would open has nothing it may show. */}
+      {gameAvailability(weekNumber, game, now).revealed ? (
+        <Link
+          to={`/matrix/game/${game.id}`}
+          title="Who picked this game"
+          className="block font-display text-sm tracking-wide text-ink underline decoration-line underline-offset-2 hover:decoration-ink print:no-underline"
+        >
+          {away} @ {home}
+        </Link>
+      ) : (
+        <span className="block font-display text-sm tracking-wide text-ink">
+          {away} @ {home}
+        </span>
+      )}
       <span className="block font-mono text-[11px] tabular-nums text-muted">
         {game.spread == null ? 'no line' : `${home} ${formatSpread(game.spread, true)}`}
       </span>

@@ -7,6 +7,7 @@ import type {
   Profile,
   WeekRow
 } from './supabase';
+import { fetchAllRows } from './pagination';
 import { buildWeekId, getCurrentWeekNumber } from './timezone';
 import { SEASON } from '../constants';
 import type { Game, Pick, Week } from '../types';
@@ -373,10 +374,28 @@ export async function getMyPicksForWeek(weekId: string, userId: string): Promise
   return (data as PickRow[]).map(toPick);
 }
 
+/**
+ * Every pick the caller may see — the league-wide read behind Standings, the
+ * Dashboard, the Matrix, Team Affinity and My History.
+ *
+ * PAGED, AND IT MUST STAY PAGED. The API returns at most 1000 rows per request
+ * and truncates without an error, and the newest rows are what falls off. A
+ * full pool crosses 1000 picks in week 7, so a bare `select('*')` made every
+ * Segment 2 table read 0-0 — the first segment-2 picks were the ones cut — while
+ * the "Wk" column, derived from whichever scored picks DID arrive, still showed
+ * week 6 and looked right. `.order('id')` gives the pages a stable total order.
+ */
 export async function getAllPicks(): Promise<Pick[]> {
-  const { data, error } = await supabase.from('picks').select('*');
-  if (error) throw error;
-  return (data as PickRow[]).map(toPick);
+  const rows = await fetchAllRows<PickRow>(async (from, to) => {
+    const { data, error } = await supabase
+      .from('picks')
+      .select('*')
+      .order('id')
+      .range(from, to);
+    if (error) throw error;
+    return data as PickRow[];
+  });
+  return rows.map(toPick);
 }
 
 export interface PickSubmission {

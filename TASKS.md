@@ -552,6 +552,50 @@ Phase 2.
 
 ---
 
+## Done (segment 2 standings, 2026-10-24)
+
+- [x] **Segment 2 standings read 0-0 for everyone while the weekly column looked
+      right.** `getAllPicks` was a bare `select('*')`, and the Supabase API
+      returns **at most 1000 rows per request and truncates without an error**,
+      in no stated order. A full sheet is five rows a member a week, so about
+      thirty members cross 1000 picks in week 7 — and what falls off the end is
+      the newest rows, i.e. the first Segment 2 picks. With none of them in the
+      data, every member's Segment 2 total is genuinely 0-0, while the "Wk"
+      column (derived from whichever scored picks DID arrive) still named week 6
+      and showed week 6 points. Each half of the table was internally honest;
+      the read underneath was short.
+
+      It was not limited to Standings. `getAllPicks` feeds the Dashboard, the
+      League Matrix, Team Affinity and My History as well, so any of them would
+      have been quietly missing the newest weeks. The code's own comment sized the
+      pool at "a couple of thousand rows" — over the cap from the start.
+
+      Fixed with `fetchAllRows` (`lib/pagination.ts`): pages of 1000 under
+      `.order('id')`, stopping on an **empty** page rather than a short one, so a
+      server capped below the page size cannot truncate it again. A failed page
+      throws rather than returning a partial table. 8 tests. No migration and no
+      data to repair — nothing was ever written wrong.
+
+      **The diagnosis is inferred, not observed.** There is no `.env.local`, so
+      nothing here could read the live table. It fits every symptom reported, but
+      to confirm: `select count(*) from picks;` in the Supabase SQL editor — a
+      count over 1000 means this was it. If the count is under 1000 the cause is
+      something else (the likeliest: week 7's picks simply not graded yet, since
+      scores only land when somebody opens a page), and this change is then a
+      harmless fix for a bug the pool had not hit yet.
+
+- [ ] **Look at Segment 2 on the deploy preview, signed in, against real data.**
+      The pure scoping (`computeStandings` with a segment scope) already had a
+      test and was never wrong; what this changes is how many rows reach it, and
+      that only shows against the live table.
+
+- [ ] **Any other unbounded read of a growing table has the same hole.** The
+      audit of `supabaseService.ts` found only `getAllPicks`: the others are
+      filtered, or are tables that stay small (profiles, weeks, ~290 games). Worth
+      remembering when the next league-wide read is added.
+
+---
+
 ## Done (display mode, 2026-09-26)
 
 - [x] **Settings → Display mode: Dark (default), Light or System** (issue #35),

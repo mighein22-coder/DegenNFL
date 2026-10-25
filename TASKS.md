@@ -552,6 +552,44 @@ Phase 2.
 
 ---
 
+## Done (picks read past 1000 rows, 2026-10-25)
+
+- [x] **`getAllPicks` would have gone short once `picks` passed 1000 rows.** It
+      was a bare `select('*')`, and the Supabase API returns **at most 1000 rows
+      per request and truncates without an error**. Not a bug the pool has hit:
+      it was found chasing a Segment 2 standings report that turned out to be a
+      misreading (the standings were right). Fixed before it could matter.
+
+      When it would have bitten: a member sees their own picks plus every pick
+      on a game that has kicked off, and past weeks are fully revealed, so the
+      read is close to the whole table. At five picks a member a week, any pool
+      of more than about eleven members crosses 1000 before week 18 (twenty
+      members in week 10, thirty in week 7). From then on Standings, the
+      Dashboard, the League Matrix, Team Affinity and My History would all have
+      been quietly missing the newest picks, with nothing on screen to say so.
+      The code's own comment already sized the pool at "a couple of thousand
+      rows".
+
+      Fixed with `fetchAllRows` (`lib/pagination.ts`): pages of 1000 under
+      `.order('id')`, stopping on an **empty** page rather than a short one, so a
+      server capped below the page size cannot truncate it either. A failed page
+      throws rather than returning a partial table. 8 tests. No migration and no
+      data to repair. Paging rather than raising "Max rows" in the Supabase
+      dashboard, because that only moves the limit and the repo cannot see the
+      setting. `select count(*) from picks;` says how close the pool is.
+
+- [ ] **Look at Standings and the Matrix on the deploy preview, signed in.** The
+      result should be identical to production while the table is under 1000
+      rows; the change is in how the rows are fetched, which no local run can
+      reach (no `.env.local`).
+
+- [ ] **Any other unbounded read of a growing table has the same hole.** The
+      audit of `supabaseService.ts` found only `getAllPicks`: the others are
+      filtered, or are tables that stay small (profiles, weeks, ~290 games). Worth
+      remembering when the next league-wide read is added.
+
+---
+
 ## Done (display mode, 2026-09-26)
 
 - [x] **Settings → Display mode: Dark (default), Light or System** (issue #35),

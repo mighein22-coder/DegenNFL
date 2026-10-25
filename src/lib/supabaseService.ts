@@ -7,6 +7,7 @@ import type {
   Profile,
   WeekRow
 } from './supabase';
+import { fetchAllRows } from './pagination';
 import { buildWeekId, getCurrentWeekNumber } from './timezone';
 import { SEASON } from '../constants';
 import type { Game, Pick, Week } from '../types';
@@ -373,10 +374,28 @@ export async function getMyPicksForWeek(weekId: string, userId: string): Promise
   return (data as PickRow[]).map(toPick);
 }
 
+/**
+ * Every pick the caller may see — the league-wide read behind Standings, the
+ * Dashboard, the Matrix, Team Affinity and My History.
+ *
+ * PAGED, AND IT MUST STAY PAGED. The API returns at most 1000 rows per request
+ * and truncates without an error. At five picks a member a week, any pool of
+ * more than about eleven members crosses 1000 before week 18 (twenty members in
+ * week 10), and from then on a bare `select('*')` would hand every screen above
+ * a table quietly missing its newest picks. `.order('id')` gives the pages a
+ * stable total order.
+ */
 export async function getAllPicks(): Promise<Pick[]> {
-  const { data, error } = await supabase.from('picks').select('*');
-  if (error) throw error;
-  return (data as PickRow[]).map(toPick);
+  const rows = await fetchAllRows<PickRow>(async (from, to) => {
+    const { data, error } = await supabase
+      .from('picks')
+      .select('*')
+      .order('id')
+      .range(from, to);
+    if (error) throw error;
+    return data as PickRow[];
+  });
+  return rows.map(toPick);
 }
 
 export interface PickSubmission {

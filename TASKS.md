@@ -552,42 +552,36 @@ Phase 2.
 
 ---
 
-## Done (segment 2 standings, 2026-10-24)
+## Done (picks read past 1000 rows, 2026-10-25)
 
-- [x] **Segment 2 standings read 0-0 for everyone while the weekly column looked
-      right.** `getAllPicks` was a bare `select('*')`, and the Supabase API
-      returns **at most 1000 rows per request and truncates without an error**,
-      in no stated order. A full sheet is five rows a member a week, so about
-      thirty members cross 1000 picks in week 7 — and what falls off the end is
-      the newest rows, i.e. the first Segment 2 picks. With none of them in the
-      data, every member's Segment 2 total is genuinely 0-0, while the "Wk"
-      column (derived from whichever scored picks DID arrive) still named week 6
-      and showed week 6 points. Each half of the table was internally honest;
-      the read underneath was short.
+- [x] **`getAllPicks` would have gone short once `picks` passed 1000 rows.** It
+      was a bare `select('*')`, and the Supabase API returns **at most 1000 rows
+      per request and truncates without an error**. Not a bug the pool has hit:
+      it was found chasing a Segment 2 standings report that turned out to be a
+      misreading (the standings were right). Fixed before it could matter.
 
-      It was not limited to Standings. `getAllPicks` feeds the Dashboard, the
-      League Matrix, Team Affinity and My History as well, so any of them would
-      have been quietly missing the newest weeks. The code's own comment sized the
-      pool at "a couple of thousand rows" — over the cap from the start.
+      When it would have bitten: a member sees their own picks plus every pick
+      on a game that has kicked off, and past weeks are fully revealed, so the
+      read is close to the whole table. At five picks a member a week, any pool
+      of more than about eleven members crosses 1000 before week 18 (twenty
+      members in week 10, thirty in week 7). From then on Standings, the
+      Dashboard, the League Matrix, Team Affinity and My History would all have
+      been quietly missing the newest picks, with nothing on screen to say so.
+      The code's own comment already sized the pool at "a couple of thousand
+      rows".
 
       Fixed with `fetchAllRows` (`lib/pagination.ts`): pages of 1000 under
       `.order('id')`, stopping on an **empty** page rather than a short one, so a
-      server capped below the page size cannot truncate it again. A failed page
+      server capped below the page size cannot truncate it either. A failed page
       throws rather than returning a partial table. 8 tests. No migration and no
-      data to repair — nothing was ever written wrong.
+      data to repair. Paging rather than raising "Max rows" in the Supabase
+      dashboard, because that only moves the limit and the repo cannot see the
+      setting. `select count(*) from picks;` says how close the pool is.
 
-      **The diagnosis is inferred, not observed.** There is no `.env.local`, so
-      nothing here could read the live table. It fits every symptom reported, but
-      to confirm: `select count(*) from picks;` in the Supabase SQL editor — a
-      count over 1000 means this was it. If the count is under 1000 the cause is
-      something else (the likeliest: week 7's picks simply not graded yet, since
-      scores only land when somebody opens a page), and this change is then a
-      harmless fix for a bug the pool had not hit yet.
-
-- [ ] **Look at Segment 2 on the deploy preview, signed in, against real data.**
-      The pure scoping (`computeStandings` with a segment scope) already had a
-      test and was never wrong; what this changes is how many rows reach it, and
-      that only shows against the live table.
+- [ ] **Look at Standings and the Matrix on the deploy preview, signed in.** The
+      result should be identical to production while the table is under 1000
+      rows; the change is in how the rows are fetched, which no local run can
+      reach (no `.env.local`).
 
 - [ ] **Any other unbounded read of a growing table has the same hole.** The
       audit of `supabaseService.ts` found only `getAllPicks`: the others are

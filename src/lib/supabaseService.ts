@@ -379,11 +379,11 @@ export async function getMyPicksForWeek(weekId: string, userId: string): Promise
  * Dashboard, the Matrix, Team Affinity and My History.
  *
  * PAGED, AND IT MUST STAY PAGED. The API returns at most 1000 rows per request
- * and truncates without an error, and the newest rows are what falls off. A
- * full pool crosses 1000 picks in week 7, so a bare `select('*')` made every
- * Segment 2 table read 0-0 — the first segment-2 picks were the ones cut — while
- * the "Wk" column, derived from whichever scored picks DID arrive, still showed
- * week 6 and looked right. `.order('id')` gives the pages a stable total order.
+ * and truncates without an error. At five picks a member a week, any pool of
+ * more than about eleven members crosses 1000 before week 18 (twenty members in
+ * week 10), and from then on a bare `select('*')` would hand every screen above
+ * a table quietly missing its newest picks. `.order('id')` gives the pages a
+ * stable total order.
  */
 export async function getAllPicks(): Promise<Pick[]> {
   const rows = await fetchAllRows<PickRow>(async (from, to) => {

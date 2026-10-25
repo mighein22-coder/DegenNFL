@@ -29,8 +29,8 @@ describe('fetchAllRows', () => {
     expect(new Set(rows).size).toBe(2350);
   });
 
-  it('still returns the newest rows of a table past the cap (the standings bug)', async () => {
-    // 1,040 rows is week 7 for ~30 members. A single capped read loses the tail.
+  it('still returns the newest rows of a table just past the cap', async () => {
+    // Just over the cap: a single capped read loses the tail.
     const { fetchPage } = server(1040, 1000);
     const single = await fetchPage(0, 999);
     expect(single).toHaveLength(1000);

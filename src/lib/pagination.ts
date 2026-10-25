@@ -4,10 +4,10 @@
  * Supabase's API returns at most 1000 rows per request (`max_rows`), and says
  * nothing when it truncates: a `select('*')` over a bigger table simply comes
  * back 1000 rows long, in no stated order, with no error. A league-wide read of
- * `picks` crosses that line mid-season — a full sheet is five rows a member a
- * week, so about thirty members pass a thousand rows in week 7 — and what falls
- * off the end is the NEWEST rows, which is exactly the part a standings table
- * is for.
+ * `picks` crosses that line during the season — a full sheet is five rows a
+ * member a week, so twenty members pass a thousand rows in week 10 — and the
+ * rows lost are whichever the server happened to put last, typically the
+ * newest, which is exactly the part a standings table is for.
  *
  * `fetchPage` takes an inclusive `[from, to]` range, the way `.range()` does.
  * The caller MUST give its query a total order (`.order('id')`): without one,

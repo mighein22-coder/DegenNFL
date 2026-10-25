@@ -148,6 +148,18 @@ Read `PLANNING.md` for why things are shaped the way they are.
       locally against a real Supabase (there is still no `.env.local`), but
       Mike checked it on the deploy preview with real data on 2026-10-13 and it
       worked as intended.
+- [x] `getAllPicks` is paged. This fix is preventive: nothing has gone wrong yet.
+      The Supabase API returns at most 1000 rows per request and gives no error
+      when it truncates, and `getAllPicks` read the whole `picks` table in one
+      unpaged `select`. Each member adds 90 picks a season, so a pool of 12 or
+      more passes 1000 rows before week 18. When that happened, Standings,
+      Dashboard, Results, Team Stats, My History and Game Picks would all have
+      silently dropped the newest picks. The fix pages through `.range()` in
+      blocks of 1000, ordered by `id`, using `fetchAllPages` in `lib/paging.ts`
+      (5 new unit tests, 223 total). Raising "Max rows" in the dashboard was
+      rejected: it only moves the limit, and the repo would have no record of
+      it. No bad data to clean up, since this was a read-only issue.
+      `select count(*) from picks;` shows how close the pool is to the limit.
 
 - [x] Wire `/picks`. `PicksPage` is the container; `PicksView` stays pure.
       Covers both non-error empty states: a week whose schedule is not captured

@@ -7,6 +7,7 @@ import type {
   Profile,
   WeekRow
 } from './supabase';
+import { fetchAllPages } from './paging';
 import { buildWeekId, getCurrentWeekNumber } from './timezone';
 import { SEASON } from '../constants';
 import type { Game, Pick, Week } from '../types';
@@ -373,10 +374,22 @@ export async function getMyPicksForWeek(weekId: string, userId: string): Promise
   return (data as PickRow[]).map(toPick);
 }
 
+/**
+ * Every pick the caller can see: their own, plus everyone's on games that have
+ * kicked off. By late season that is close to the whole table, which passes the
+ * API's 1000-row cap — hence paged, ordered by `id` so pages cannot overlap.
+ */
 export async function getAllPicks(): Promise<Pick[]> {
-  const { data, error } = await supabase.from('picks').select('*');
-  if (error) throw error;
-  return (data as PickRow[]).map(toPick);
+  const rows = await fetchAllPages(async (from, to) => {
+    const { data, error } = await supabase
+      .from('picks')
+      .select('*')
+      .order('id')
+      .range(from, to);
+    if (error) throw error;
+    return data as PickRow[];
+  });
+  return rows.map(toPick);
 }
 
 export interface PickSubmission {
